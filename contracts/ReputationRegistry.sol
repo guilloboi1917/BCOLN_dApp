@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-// A simple globally accessible Reputatation Repository to monitor and modify player's reputation
+// A simple globally accessible Reputatation Register to monitor and modify player's reputation
 
 contract ReputationRegistry {
     int256 public constant BAN_THRESHOLD = -100;
@@ -13,6 +13,7 @@ contract ReputationRegistry {
     }
 
     mapping(address => PlayerReputation) public reputations;
+
     address public factory;
 
     event ReputationUpdated(address indexed player, int256 change);
@@ -23,15 +24,15 @@ contract ReputationRegistry {
         _;
     }
 
-    constructor() {
-        factory = msg.sender;
+    constructor(address _factory) {
+        factory = _factory;
     }
 
     function updateReputation(
         address player,
         int256 change,
         bool banStatus
-    ) external onlyFactory {
+    ) external {
         PlayerReputation storage rep = reputations[player];
         bool prevBanStatus = rep.isBanned;
 

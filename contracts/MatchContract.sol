@@ -2,17 +2,19 @@
 pragma solidity ^0.8.0;
 
 import "./ReputationRegistry.sol";
+import "hardhat/console.sol";
 
 contract MatchContract {
     // To follow EIP-1167 pattern we require the following addresses
-    address public factory; // address of the factory taking care of contract creation
+    address public immutable factory; // address of the factory taking care of contract creation
     address public creator; // address of the creator who initialized this contract
     bool public initialized;
 
-    ReputationRegistry public reputationRegistry;
+    ReputationRegistry public immutable reputationRegistry;
 
     // Match states
     enum MatchStatus {
+        Pending,
         Commit,
         Reveal,
         Dispute,
@@ -32,16 +34,20 @@ contract MatchContract {
         address player2;
         bytes32 player1Commit;
         bytes32 player2Commit;
+        bool player1Joined;
+        bool player2Joined;
         string player1Result;
         string player2Result;
         bytes32 player1Salt;
         bytes32 player2Salt;
-        MatchStatus status;
-        uint256 stakeAmount;
+        uint256 entryFee;
         address[] juryPool;
         mapping(address => uint256) juryVotes;
         uint256 revealDeadline;
     }
+
+    // For some reason we need to take this out of the struct otherwise it won't compile
+    MatchStatus public status;
 
     // Constants
     uint256 public constant JURY_STAKE = 0.1 ether;
@@ -65,6 +71,7 @@ contract MatchContract {
     event DisputeInitiated();
     event JuryVoted(address indexed juror, uint256 vote);
     event MatchResolved(address indexed winner);
+    event PlayerJoined(address indexed player);
 
     // Modifiers
     modifier onlyPlayers() {
@@ -82,53 +89,77 @@ contract MatchContract {
         _;
     }
 
-    // Initializer (To follow EIP-1167)
+    // Constructor for immutables only
+    constructor(address _factory, address _registry) {
+        factory = _factory;
+        reputationRegistry = ReputationRegistry(_registry);
+    }
+
+    // Initializer (To follow EIP-1167) to create initial deployment of this contract
     function initialize(
         address _creator,
         address _player1,
         address _player2,
-        uint256 _stake,
-        address _reputationRegistry
+        uint256 _entryFee
     ) external {
         require(!initialized, "Already initialized");
 
-        // Factory will always delegate the creation of matches
-        factory = msg.sender;
         creator = _creator;
         currentMatch.player1 = _player1;
         currentMatch.player2 = _player2;
-        currentMatch.stakeAmount = _stake; // Maybe ensure stake is a minimum value
+        currentMatch.entryFee = _entryFee;
         currentMatch.revealDeadline = block.timestamp + REVEAL_PERIOD;
-        currentMatch.status = MatchStatus.Commit;
-
-        reputationRegistry = ReputationRegistry(_reputationRegistry);
+        status = MatchStatus.Pending;
+        currentMatch.player1Joined = false;
+        currentMatch.player2Joined = false;
 
         initialized = true;
 
         emit MatchCreated(_player1, _player2);
     }
 
+    function getMatchStatus() external view returns (MatchStatus) {
+        return status;
+    }
+
+    function getEntryFee() external view returns (uint256) {
+        return currentMatch.entryFee;
+    }
+
+    function joinMatch() external payable onlyPlayers {
+        require(msg.value == currentMatch.entryFee, "Wrong Entry Fee");
+
+        emit PlayerJoined(msg.sender);
+
+        // Add so that player informed if already joined
+        if (msg.sender == currentMatch.player1)
+            currentMatch.player1Joined = true;
+        else currentMatch.player2Joined = true;
+
+        // Set match to commit state after both joined
+        if (currentMatch.player1Joined && currentMatch.player2Joined) {
+            status = MatchStatus.Commit;
+        }
+    }
+
     // Commit phase
     function commitResult(
         bytes32 hashedCommitment
     ) external payable onlyPlayers {
-        require(
-            currentMatch.status == MatchStatus.Commit,
-            "Not in commit phase"
-        );
+        require(status == MatchStatus.Commit, "Not in commit phase");
 
         if (msg.sender == currentMatch.player1) {
             require(
                 msg.value ==
                     reputationRegistry.getStakeAmount(msg.sender) *
-                        currentMatch.stakeAmount
+                        currentMatch.entryFee
             );
             currentMatch.player1Commit = hashedCommitment;
         } else {
             require(
                 msg.value ==
                     reputationRegistry.getStakeAmount(msg.sender) *
-                        currentMatch.stakeAmount
+                        currentMatch.entryFee
             );
             currentMatch.player2Commit = hashedCommitment;
         }
@@ -138,7 +169,7 @@ contract MatchContract {
             currentMatch.player1Commit != bytes32(0) &&
             currentMatch.player2Commit != bytes32(0)
         ) {
-            currentMatch.status = MatchStatus.Reveal;
+            status = MatchStatus.Reveal;
         }
     }
 
@@ -147,10 +178,7 @@ contract MatchContract {
         bytes32 salt,
         string memory result
     ) external onlyPlayers {
-        require(
-            currentMatch.status == MatchStatus.Reveal,
-            "Not in reveal phase"
-        );
+        require(status == MatchStatus.Reveal, "Not in reveal phase");
         require(
             block.timestamp <= currentMatch.revealDeadline,
             "Reveal period expired"
@@ -183,7 +211,7 @@ contract MatchContract {
             ) {
                 _resolveMatch(msg.sender); // Same result
             } else {
-                currentMatch.status = MatchStatus.Dispute;
+                status = MatchStatus.Dispute;
                 emit DisputeInitiated();
             }
         }
@@ -194,18 +222,12 @@ contract MatchContract {
         require(!reputationRegistry.isBanned(msg.sender), "You are banned");
         require(msg.value == JURY_STAKE, "Incorrect jury stake");
 
-        require(
-            currentMatch.status == MatchStatus.Dispute,
-            "No active dispute"
-        );
+        require(status == MatchStatus.Dispute, "No active dispute");
         currentMatch.juryPool.push(msg.sender);
     }
 
     function voteAsJuror(uint256 vote) external {
-        require(
-            currentMatch.status == MatchStatus.Dispute,
-            "No active dispute"
-        );
+        require(status == MatchStatus.Dispute, "No active dispute");
 
         bool isJuror = false;
         for (uint i = 0; i < currentMatch.juryPool.length; i++) {
@@ -240,7 +262,7 @@ contract MatchContract {
 
     // Internal resolution functions
     function _resolveMatch(address winner) private {
-        currentMatch.status = MatchStatus.Completed;
+        status = MatchStatus.Completed;
 
         // Update reputations
         address loser = winner == currentMatch.player1
@@ -251,12 +273,12 @@ contract MatchContract {
         reputationRegistry.updateReputation(loser, REP_TRUTHFUL, false);
 
         // Payout
-        payable(winner).transfer(currentMatch.stakeAmount * 2);
+        payable(winner).transfer(currentMatch.entryFee * 2);
         emit MatchResolved(winner);
     }
 
     function _resolveDispute(address winner) private {
-        currentMatch.status = MatchStatus.Completed;
+        status = MatchStatus.Completed;
 
         // Penalize liar
         address liar = winner == currentMatch.player1
@@ -279,7 +301,7 @@ contract MatchContract {
 
         // Payout
         payable(winner).transfer(
-            currentMatch.stakeAmount *
+            currentMatch.entryFee *
                 2 -
                 (JURY_REWARD * currentMatch.juryPool.length)
         );
