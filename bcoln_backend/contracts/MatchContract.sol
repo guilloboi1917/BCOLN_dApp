@@ -127,11 +127,6 @@ contract MatchContract {
         return currentMatch.entryFee;
     }
 
-    // To know what result to report
-    function isPlayer1() external view returns (bool) onlyPlayers {
-        return msg.sender == currentMatch.player1;
-    }
-
     function joinMatch() external payable onlyPlayers {
         require(msg.value == currentMatch.entryFee, "Wrong Entry Fee");
 
@@ -185,7 +180,7 @@ contract MatchContract {
     // Remember: When revealing, we provide our initial salt and the result
     function revealResult(
         bytes32 salt,
-        bool memory result
+        bool result
     ) external onlyPlayers {
         require(status == MatchStatus.Reveal, "Not in reveal phase");
         require(
