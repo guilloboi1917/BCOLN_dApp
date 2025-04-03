@@ -15,7 +15,7 @@ contract MatchContractFactory {
     event MatchCreated(address indexed matchAddress, address indexed creator);
 
     constructor() {
-        // Deploy dependencies for this
+        // Single reputationRegistry per MatchContractFactory
         reputationRegistry = new ReputationRegistry(address(this));
 
         // Then deploy template contract for matches
@@ -58,15 +58,28 @@ contract MatchContractFactory {
         reputationRegistry.updateReputation(player, change, banStatus);
     }
 
+    function getMatchCount() external view returns (uint256) {
+        return matches.length;
+    }
+
     // EIP-1167 Minimal Proxy Clone
     function clone(address implementation) internal returns (address instance) {
+        // See https://eips.ethereum.org/EIPS/eip-1167
+        // We want 363d3d373d3d3d363d73<implementation>5af43d82803e903d91602b57fd5bf3
         assembly {
+            // Load the free memory pointer (0x40 is the slot for free memory pointer)
             let ptr := mload(0x40)
+
+            // Store the first part of the proxy contract bytecode in memory
             mstore(
                 ptr,
                 0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000
             )
+            // Store the implementation address (shifted left to fit in the placeholder)
+            // Remember, SHL move data to the more significant bits, it uses big-endian
+            // This replaces the 20-byte zero placeholder with the actual 20-byte implementation address
             mstore(add(ptr, 0x14), shl(0x60, implementation))
+            // Store the remaining part of the proxy contract bytecode
             mstore(
                 add(ptr, 0x28),
                 0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000
@@ -76,8 +89,9 @@ contract MatchContractFactory {
         require(instance != address(0), "Clone failed");
     }
 
-    // Add clone detection
+    // clone detection
     function isClone(address query) internal view returns (bool) {
+        // Checks if it is a proxy
         bytes20 targetBytes = bytes20(matchContractTemplate);
         bytes20 queryBytes = bytes20(query);
 
@@ -85,9 +99,5 @@ contract MatchContractFactory {
         bytes memory code = query.code;
         return
             code.length == 45 && code[0] == 0x3d && queryBytes == targetBytes;
-    }
-
-    function getMatchCount() external view returns (uint256) {
-        return matches.length;
     }
 }

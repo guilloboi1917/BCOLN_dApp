@@ -36,8 +36,8 @@ contract MatchContract {
         bytes32 player2Commit;
         bool player1Joined;
         bool player2Joined;
-        string player1Result;
-        string player2Result;
+        string player1Result; // Report result as "I won" in reveal and convert it later to string "player1_won", "player2_won"
+        string player2Result; 
         bytes32 player1Salt;
         bytes32 player2Salt;
         uint256 entryFee;
@@ -46,7 +46,7 @@ contract MatchContract {
         uint256 revealDeadline;
     }
 
-    // For some reason we need to take this out of the struct otherwise it won't compile
+    // For some reason we need to take this out of the struct otherwise it won't compile due to stack depth
     MatchStatus public status;
 
     // Constants
@@ -96,6 +96,7 @@ contract MatchContract {
     }
 
     // Initializer (To follow EIP-1167) to create initial deployment of this contract
+    // initialize is used instead of the constructor when a contract that uses a proxy is published
     function initialize(
         address _creator,
         address _player1,
@@ -126,6 +127,11 @@ contract MatchContract {
         return currentMatch.entryFee;
     }
 
+    // To know what result to report
+    function isPlayer1() external view returns (bool) onlyPlayers {
+        return msg.sender == currentMatch.player1;
+    }
+
     function joinMatch() external payable onlyPlayers {
         require(msg.value == currentMatch.entryFee, "Wrong Entry Fee");
 
@@ -143,6 +149,8 @@ contract MatchContract {
     }
 
     // Commit phase
+    // Remember: For the initial commit, we use a salt and the string "I_report_truth" and hash it
+    // This will be sent here
     function commitResult(
         bytes32 hashedCommitment
     ) external payable onlyPlayers {
@@ -174,9 +182,10 @@ contract MatchContract {
     }
 
     // Reveal phase
+    // Remember: When revealing, we provide our initial salt and the result
     function revealResult(
         bytes32 salt,
-        string memory result
+        bool memory result
     ) external onlyPlayers {
         require(status == MatchStatus.Reveal, "Not in reveal phase");
         require(
@@ -188,13 +197,14 @@ contract MatchContract {
             abi.encodePacked("I_report_truth", salt)
         );
 
+        // It feels a bit redunant, no?
         if (msg.sender == currentMatch.player1) {
             require(commitment == currentMatch.player1Commit, "Invalid reveal");
-            currentMatch.player1Result = result;
+            currentMatch.player1Result = result ? "player1_won" : "player2_won"; // By doing it like this, players don't need to know if they are player1 or player2
             currentMatch.player1Salt = salt;
         } else {
             require(commitment == currentMatch.player2Commit, "Invalid reveal");
-            currentMatch.player2Result = result;
+            currentMatch.player2Result = result ? "player2_won" : "player1_won"; // vice versa
             currentMatch.player2Salt = salt;
         }
 

@@ -28,6 +28,8 @@ contract ReputationRegistry {
         factory = _factory;
     }
 
+    // To update the reputation of a player
+    // Need to make sure only the MatchContract can update reputation
     function updateReputation(
         address player,
         int256 change,
@@ -58,6 +60,7 @@ contract ReputationRegistry {
         return reputations[_player].isBanned;
     }
 
+    // Values can be adapted
     function getStakeAmount(address player) external view returns (uint256) {
         if (reputations[player].isBanned) revert("Banned player");
         if (reputations[player].score >= 50) return 0.5 ether;
