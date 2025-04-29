@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from "react"
 import { toast } from "sonner"
+import { ethers } from "ethers";
 
 // Create a context for Web3 functionality
 const Web3Context = createContext({
@@ -22,39 +23,44 @@ export function Web3Provider({ children }) {
   const [address, setAddress] = useState(null)
   const [balance, setBalance] = useState("0")
 
-  // Mock connection to wallet
   const connect = async () => {
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      // Mock successful connection
-      const mockAddress = `0x${Math.random().toString(16).substring(2, 42)}`
-      const mockBalance = (Math.random() * 10).toFixed(4)
-
-      setAddress(mockAddress)
-      setBalance(mockBalance)
-      setConnected(true)
-
+      if (!window.ethereum) {
+        toast.error("MetaMask not detected", {
+          description: "Please install MetaMask to connect your wallet.",
+        });
+        return;
+      }
+  
+      const ethProvider = new ethers.BrowserProvider(window.ethereum);
+      const accounts = await ethProvider.send("eth_requestAccounts", []);
+      const userAddress = accounts[0];
+      const balanceInWei = await ethProvider.getBalance(userAddress);
+      const ethBalance = ethers.formatEther(balanceInWei);
+  
+      setAddress(userAddress);
+      setBalance(parseFloat(ethBalance).toFixed(4));
+      setConnected(true);
+  
       toast.success("Wallet connected", {
-        description: "Your wallet has been successfully connected"
-      })
+        description: "Your wallet has been successfully connected",
+      });
     } catch (error) {
-      console.error("Error connecting wallet:", error)
+      console.error("Error connecting wallet:", error);
       toast.error("Connection failed", {
-        description: "Failed to connect wallet. Please try again."
-      })
+        description: "Failed to connect wallet. Please try again.",
+      });
     }
-  }
+  };
 
   const disconnect = () => {
-    setAddress(null)
-    setBalance("0")
-    setConnected(false)
-
+    setAddress(null);
+    setBalance("0");
+    setConnected(false);
     toast.info("Wallet disconnected", {
-      description: "Your wallet has been disconnected"
-    })
-  }
+      description: "Your wallet has been disconnected",
+    });
+  };
 
   // Mock joining a tournament
   const joinTournament = async (tournamentId, entryFee) => {
@@ -87,22 +93,19 @@ export function Web3Provider({ children }) {
     return
   }
 
-  // Mock signing a message
   const signMessage = async (message) => {
-    if (!connected) throw new Error("Wallet not connected")
-
-    // In the real app, this would use the wallet to sign the message
-    console.log("Signing message:", message)
-
-    // Mock signing
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // Return a mock signature
-    return `0x${Array(130)
-      .fill(0)
-      .map(() => Math.floor(Math.random() * 16).toString(16))
-      .join("")}`
-  }
+    if (!connected) throw new Error("Wallet not connected");
+  
+    try {
+      const ethProvider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await ethProvider.getSigner();
+      const signature = await signer.signMessage(message);
+      return signature;
+    } catch (err) {
+      console.error("Sign error:", err);
+      throw err;
+    }
+  };
 
   // Check if wallet was previously connected
   useEffect(() => {
