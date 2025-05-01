@@ -33,8 +33,6 @@ export default function TournamentDetailsPage() {
   const [isJoining, setIsJoining] = useState(false);
   const [tournament, setTournament] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [matchReportOpen, setMatchReportOpen] = useState(false);
-  const [selectedMatch, setSelectedMatch] = useState(null);
 
   useEffect(() => {
     // Mock API call to fetch tournament details
@@ -56,7 +54,7 @@ export default function TournamentDetailsPage() {
           currentParticipants: 8,
           startDate: "May 15, 2025",
           registrationDeadline: "May 10, 2025",
-          status: "open",
+          status: "active",
           organizer: "0x1234...5678",
           participants: Array(8)
             .fill(0)
@@ -74,7 +72,7 @@ export default function TournamentDetailsPage() {
             {
               id: "m1",
               round: 1,
-              player1: "0x1234...5678",
+              player1: "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
               player2: "0x5678...9012",
               winner: null,
               status: "scheduled",
@@ -92,6 +90,17 @@ export default function TournamentDetailsPage() {
               scheduledTime: "May 15, 2025, 1:00 PM",
               resolutionDeadline: "May 17, 2025, 12:00 PM",
               juryDecision: "0x2345...6789", // winner's address if resolved by jury
+            },
+            {
+              id: "m3",
+              round: 1,
+              player1: "0x1234...5678",
+              player2: "0x5678...9012",
+              winner: null,
+              status: "completed",
+              scheduledTime: "May 15, 2025, 12:00 PM",
+              resolutionDeadline: "May 17, 2025, 12:00 PM",
+              juryDecision: null,
             },
           ],
         });
@@ -146,11 +155,6 @@ export default function TournamentDetailsPage() {
     } finally {
       setIsJoining(false);
     }
-  };
-
-  const handleReportMatch = (match) => {
-    setSelectedMatch(match);
-    setMatchReportOpen(true);
   };
 
   if (isLoading) {
@@ -228,11 +232,6 @@ export default function TournamentDetailsPage() {
               {isJoining
                 ? "Joining..."
                 : `Join Tournament (${tournament.entryFee})`}
-            </Button>
-          )}
-          {isParticipant && tournament.status === "active" && (
-            <Button variant="outline" onClick={() => setMatchReportOpen(true)}>
-              Report Match Result
             </Button>
           )}
           <Button variant="outline" asChild>
@@ -530,20 +529,6 @@ export default function TournamentDetailsPage() {
           </Card>
         </TabsContent>
       </Tabs>
-
-      <MatchReportDialog
-        open={matchReportOpen}
-        onOpenChange={setMatchReportOpen}
-        match={selectedMatch}
-        onSubmit={(result) => {
-          console.log("Match result submitted:", result);
-          toast.success("Result submitted", {
-            description:
-              "Your match result has been submitted and is awaiting confirmation",
-          });
-          setMatchReportOpen(false);
-        }}
-      />
     </div>
   );
 }
