@@ -7,52 +7,48 @@ export function TournamentBracket({ tournament }) {
   const [rounds, setRounds] = useState([])
 
   useEffect(() => {
-    // In the real app, this would be calculated based on the tournament data
-    // For now, we'll create a mock bracket
-    const maxParticipants = tournament.maxParticipants
-    const numRounds = Math.log2(maxParticipants)
-
-    const mockRounds = []
-
-    for (let i = 1; i <= numRounds; i++) {
-      const numMatches = maxParticipants / Math.pow(2, i)
-      const matches = []
-
-      for (let j = 0; j < numMatches; j++) {
-        // Find if there's a real match for this position
-        const realMatch = tournament.matches.find((m) => m.round === i && j === Math.floor(j / 2))
-
-        if (realMatch) {
-          matches.push(realMatch)
+    const maxParticipants = tournament.maxParticipants;
+    const numRounds = Math.log2(maxParticipants);
+    const groupedRounds = [];
+  
+    for (let round = 1; round <= numRounds; round++) {
+      const expectedMatches = maxParticipants / Math.pow(2, round);
+      const realMatches = tournament.matches.filter((m) => m.round === round);
+      const filledMatches = [];
+  
+      for (let i = 0; i < expectedMatches; i++) {
+        const match = realMatches[i];
+  
+        if (match) {
+          filledMatches.push(match);
         } else {
-          matches.push({
-            id: `mock-${i}-${j}`,
-            round: i,
-            player1: i === 1 && j < tournament.currentParticipants / 2 ? tournament.participants[j * 2]?.address : null,
-            player2:
-              i === 1 && j < tournament.currentParticipants / 2 ? tournament.participants[j * 2 + 1]?.address : null,
+          filledMatches.push({
+            id: `placeholder-${round}-${i}`,
+            round,
+            player1: null,
+            player2: null,
             winner: null,
             status: "pending",
-          })
+          });
         }
       }
-
-      mockRounds.push({
-        round: i,
+  
+      groupedRounds.push({
+        round,
         name:
-          i === numRounds
+          round === numRounds
             ? "Final"
-            : i === numRounds - 1
-              ? "Semi-Finals"
-              : i === numRounds - 2
-                ? "Quarter-Finals"
-                : `Round ${i}`,
-        matches,
-      })
+            : round === numRounds - 1
+            ? "Semi-Finals"
+            : round === numRounds - 2
+            ? "Quarter-Finals"
+            : `Round ${round}`,
+        matches: filledMatches,
+      });
     }
-
-    setRounds(mockRounds)
-  }, [tournament])
+  
+    setRounds(groupedRounds);
+  }, [tournament]);
 
   if (rounds.length === 0) {
     return (
@@ -73,7 +69,7 @@ export function TournamentBracket({ tournament }) {
                 <Card key={match.id} className="p-3 text-xs">
                   <div className="space-y-2">
                     <div
-                      className={`p-2 rounded ${match.winner === match.player1 ? "bg-green-100 dark:bg-green-900" : "bg-muted"}`}
+                      className={`p-2 rounded ${match.winner && match.winner === match.player1 ? "bg-green-100 dark:bg-green-900" : "bg-muted"}`}
                     >
                       {match.player1 ? (
                         <div className="truncate">{match.player1}</div>
@@ -82,7 +78,7 @@ export function TournamentBracket({ tournament }) {
                       )}
                     </div>
                     <div
-                      className={`p-2 rounded ${match.winner === match.player2 ? "bg-green-100 dark:bg-green-900" : "bg-muted"}`}
+                      className={`p-2 rounded ${match.winner && match.winner === match.player2 ? "bg-green-100 dark:bg-green-900" : "bg-muted"}`}
                     >
                       {match.player2 ? (
                         <div className="truncate">{match.player2}</div>

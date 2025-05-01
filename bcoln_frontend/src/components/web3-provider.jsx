@@ -61,12 +61,6 @@ export function Web3Provider({ children }) {
         }
       }
 
-      // Network is correct — proceed
-      await window.ethereum.request({
-        method: "wallet_requestPermissions",
-        params: [{ eth_accounts: {} }],
-      });
-
       const accounts = await ethProvider.send("eth_requestAccounts", []);
       const userAddress = accounts[0];
       const balanceInWei = await ethProvider.getBalance(userAddress);
@@ -102,33 +96,75 @@ export function Web3Provider({ children }) {
 
   // Mock joining a tournament
   const joinTournament = async (tournamentId, entryFee) => {
-    if (!connected) throw new Error("Wallet not connected")
+    if (!connected || !signer) throw new Error("Wallet not connected");
 
-    // In the real app, this would call the smart contract to join the tournament
-    console.log(`Joining tournament ${tournamentId} with entry fee ${entryFee}`)
+    const contract = new ethers.Contract(
+      TOURNAMENT_CONTRACT_ADDRESS,
+      TOURNAMENT_ABI,
+      signer
+    );
 
-    // Mock transaction
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    const tx = await contract.joinTournament(tournamentId, {
+      value: ethers.parseEther(entryFeeEth.toString()),
+    });
 
-    // Update balance after paying entry fee
-    const fee = Number.parseFloat(entryFee.replace(" ETH", ""))
-    const newBalance = (Number.parseFloat(balance) - fee).toFixed(4)
-    setBalance(newBalance)
+    await tx.wait();
 
-    return
+    const newBalance = await signer.getBalance();
+    setBalance(ethers.formatEther(newBalance));
   }
 
   // Mock creating a tournament
   const createTournament = async (tournamentData) => {
     if (!connected) throw new Error("Wallet not connected")
 
-    // In the real app, this would call the smart contract to create the tournament
-    console.log("Creating tournament with data:", tournamentData)
-
-    // Mock transaction
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-
-    return
+      const contractAddress = "YOUR_CONTRACT_ADDRESS"; // Replace with your contract address
+      const contractABI = [
+        // Replace with your actual contract ABI
+        {
+          "inputs": [
+            { "internalType": "string", "name": "title", "type": "string" },
+            { "internalType": "string", "name": "description", "type": "string" },
+            { "internalType": "uint256", "name": "entryFee", "type": "uint256" },
+            { "internalType": "uint256", "name": "prize", "type": "uint256" },
+            { "internalType": "uint256", "name": "maxParticipants", "type": "uint256" },
+            { "internalType": "uint256", "name": "startDate", "type": "uint256" },
+          ],
+          "name": "createTournament",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function",
+        },
+      ];
+    
+      // Create contract instance
+      const ethProvider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await ethProvider.getSigner();
+      const contract = new ethers.Contract(contractAddress, contractABI, signer);
+    
+      try {
+        // Call the smart contract to create a tournament
+        const tx = await contract.createTournament(
+          tournamentData.title,
+          tournamentData.description,
+          ethers.utils.parseEther(tournamentData.entryFee.toString()), // Convert to Wei
+          ethers.utils.parseEther(tournamentData.prize.toString()), // Convert to Wei
+          tournamentData.maxParticipants,
+          Math.floor(tournamentData.startDate.getTime() / 1000) // Convert to Unix timestamp
+        );
+    
+        // Wait for transaction to be mined
+        await tx.wait();
+    
+        toast.success("Tournament created successfully!", {
+          description: "Your tournament has been created on the blockchain.",
+        });
+      } catch (error) {
+        console.error("Error creating tournament:", error);
+        toast.error("Failed to create tournament", {
+          description: "There was an error creating your tournament. Please try again.",
+        });
+      }
   }
 
   const signMessage = async (message) => {
@@ -145,32 +181,40 @@ export function Web3Provider({ children }) {
     }
   };
 
-  // Check if wallet was previously connected
   useEffect(() => {
-    // In the real app, this would check localStorage or the wallet provider
-    const checkConnection = async () => {
-      const wasConnected = localStorage.getItem("walletConnected") === "true"
-
-      if (wasConnected) {
-        try {
-          await connect()
-        } catch (error) {
-          console.error("Error reconnecting wallet:", error)
-        }
-      }
+    const wasConnected = localStorage.getItem("walletConnected") === "true";
+  
+    if (wasConnected) {
+      setConnected(true);
     }
+  }, []);
 
-    checkConnection()
-  }, [])
+  // // Check if wallet was previously connected
+  // useEffect(() => {
+  //   // In the real app, this would check localStorage or the wallet provider
+  //   const checkConnection = async () => {
+  //     const wasConnected = localStorage.getItem("walletConnected") === "true"
 
-  // Save connection state
-  useEffect(() => {
-    if (connected) {
-      localStorage.setItem("walletConnected", "true")
-    } else {
-      localStorage.removeItem("walletConnected")
-    }
-  }, [connected])
+  //     if (wasConnected) {
+  //       try {
+  //         await connect()
+  //       } catch (error) {
+  //         console.error("Error reconnecting wallet:", error)
+  //       }
+  //     }
+  //   }
+
+  //   checkConnection()
+  // }, [])
+
+  // // Save connection state
+  // useEffect(() => {
+  //   if (connected) {
+  //     localStorage.setItem("walletConnected", "true")
+  //   } else {
+  //     localStorage.removeItem("walletConnected")
+  //   }
+  // }, [connected])
 
   return (
     <Web3Context.Provider

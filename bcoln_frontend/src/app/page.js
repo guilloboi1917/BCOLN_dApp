@@ -51,7 +51,6 @@ export default function Home() {
             Create, join, and compete in blockchain-powered tournaments
           </p>
         </div>
-        <WalletConnect className="mt-4 md:mt-0" />
       </div>
 
       <section className="mb-12">

@@ -1,35 +1,48 @@
-﻿"use client"
+﻿"use client";
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import { useParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { TournamentBracket } from "@/components/tournament-bracket"
-import { ParticipantsList } from "@/components/participants-list"
-import { MatchReportDialog } from "@/components/match-report-dialog"
-import { toast } from "sonner"
-import { useWeb3 } from "@/hooks/use-web3"
-import { Calendar, Trophy, Users, Clock, AlertCircle, CheckCircle2 } from "lucide-react"
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TournamentBracket } from "@/components/tournament-bracket";
+import { ParticipantsList } from "@/components/participants-list";
+import { MatchReportDialog } from "@/components/match-report-dialog";
+import { toast } from "sonner";
+import { useWeb3 } from "@/hooks/use-web3";
+import {
+  Calendar,
+  Trophy,
+  Users,
+  Clock,
+  AlertCircle,
+  CheckCircle2,
+} from "lucide-react";
 
 export default function TournamentDetailsPage() {
-  const { id } = useParams()
-  const { connected, address, joinTournament } = useWeb3()
-  const [isJoining, setIsJoining] = useState(false)
-  const [tournament, setTournament] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [matchReportOpen, setMatchReportOpen] = useState(false)
-  const [selectedMatch, setSelectedMatch] = useState(null)
+  const { id } = useParams();
+  const { connected, address, joinTournament } = useWeb3();
+  const [isJoining, setIsJoining] = useState(false);
+  const [tournament, setTournament] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [matchReportOpen, setMatchReportOpen] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState(null);
 
   useEffect(() => {
     // Mock API call to fetch tournament details
     const fetchTournament = async () => {
-      setIsLoading(true)
+      setIsLoading(true);
       try {
         // In a real app, this would be an API call to your backend or directly to the blockchain
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
         // Mock data
         setTournament({
@@ -39,17 +52,23 @@ export default function TournamentDetailsPage() {
             "The biggest blockchain gaming tournament of the year. Compete against the best players from around the world in this prestigious event.",
           entryFee: "0.05 ETH",
           prize: "10 ETH",
-          maxParticipants: 32,
-          currentParticipants: 18,
+          maxParticipants: 8,
+          currentParticipants: 8,
           startDate: "May 15, 2025",
           registrationDeadline: "May 10, 2025",
           status: "open",
           organizer: "0x1234...5678",
-          participants: Array(18)
+          participants: Array(8)
             .fill(0)
             .map((_, i) => ({
-              address: `0x${Math.random().toString(16).substring(2, 10)}...${Math.random().toString(16).substring(2, 6)}`,
-              joinedAt: new Date(Date.now() - Math.random() * 10000000000).toISOString(),
+              address: `0x${Math.random()
+                .toString(16)
+                .substring(2, 10)}...${Math.random()
+                .toString(16)
+                .substring(2, 6)}`,
+              joinedAt: new Date(
+                Date.now() - Math.random() * 10000000000
+              ).toISOString(),
             })),
           matches: [
             {
@@ -60,6 +79,8 @@ export default function TournamentDetailsPage() {
               winner: null,
               status: "scheduled",
               scheduledTime: "May 15, 2025, 12:00 PM",
+              resolutionDeadline: "May 17, 2025, 12:00 PM",
+              juryDecision: null,
             },
             {
               id: "m2",
@@ -67,40 +88,42 @@ export default function TournamentDetailsPage() {
               player1: "0x2345...6789",
               player2: "0x6789...0123",
               winner: "0x2345...6789",
-              status: "completed",
+              status: "disputed",
               scheduledTime: "May 15, 2025, 1:00 PM",
+              resolutionDeadline: "May 17, 2025, 12:00 PM",
+              juryDecision: "0x2345...6789", // winner's address if resolved by jury
             },
           ],
-        })
+        });
       } catch (error) {
-        console.error("Error fetching tournament:", error)
+        console.error("Error fetching tournament:", error);
         toast.error("Error loading tournament", {
-        description: "Could not load tournament details. Please try again."
-        })
+          description: "Could not load tournament details. Please try again.",
+        });
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
+    };
 
-    fetchTournament()
-  }, [id])
+    fetchTournament();
+  }, [id]);
 
   const handleJoinTournament = async () => {
     if (!connected) {
       toast.info("Wallet not connected", {
-        description: "Please connect your wallet to join this tournament"
-        })
-      return
+        description: "Please connect your wallet to join this tournament",
+      });
+      return;
     }
 
-    setIsJoining(true)
+    setIsJoining(true);
     try {
       // This would call the actual contract method in a real implementation
-      await joinTournament(id, tournament.entryFee)
+      await joinTournament(id, tournament.entryFee);
 
       toast.success("Successfully joined!", {
-        description:  "You have successfully joined the tournament"
-        })
+        description: "You have successfully joined the tournament",
+      });
 
       // Update the tournament state to reflect the new participant
       setTournament((prev) => ({
@@ -113,32 +136,34 @@ export default function TournamentDetailsPage() {
             joinedAt: new Date().toISOString(),
           },
         ],
-      }))
+      }));
     } catch (error) {
-      console.error("Error joining tournament:", error)
+      console.error("Error joining tournament:", error);
       toast.error("Error joining tournament", {
-        description:  "There was an error joining the tournament. Please try again."
-        })
-
+        description:
+          "There was an error joining the tournament. Please try again.",
+      });
     } finally {
-      setIsJoining(false)
+      setIsJoining(false);
     }
-  }
+  };
 
   const handleReportMatch = (match) => {
-    setSelectedMatch(match)
-    setMatchReportOpen(true)
-  }
+    setSelectedMatch(match);
+    setMatchReportOpen(true);
+  };
 
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[60vh]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading tournament details...</p>
+          <p className="mt-4 text-muted-foreground">
+            Loading tournament details...
+          </p>
         </div>
       </div>
-    )
+    );
   }
 
   if (!tournament) {
@@ -155,12 +180,15 @@ export default function TournamentDetailsPage() {
           </Button>
         </div>
       </div>
-    )
+    );
   }
 
-  const isParticipant = tournament.participants.some((p) => p.address === address)
-  const isFull = tournament.currentParticipants >= tournament.maxParticipants
-  const canJoin = !isParticipant && !isFull && tournament.status === "open" && connected
+  const isParticipant = tournament.participants.some(
+    (p) => p.address === address
+  );
+  const isFull = tournament.currentParticipants >= tournament.maxParticipants;
+  const canJoin =
+    !isParticipant && !isFull && tournament.status === "open" && connected;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -170,14 +198,18 @@ export default function TournamentDetailsPage() {
           <div className="flex flex-wrap gap-2 mt-2">
             <Badge
               variant={
-                tournament.status === "open" ? "default" : tournament.status === "active" ? "outline" : "secondary"
+                tournament.status === "open"
+                  ? "default"
+                  : tournament.status === "active"
+                  ? "outline"
+                  : "secondary"
               }
             >
               {tournament.status === "open"
                 ? "Open for Entry"
                 : tournament.status === "active"
-                  ? "Active"
-                  : "Completed"}
+                ? "Active"
+                : "Completed"}
             </Badge>
             <Badge variant="outline" className="flex items-center gap-1">
               <Trophy className="h-3 w-3" />
@@ -193,7 +225,9 @@ export default function TournamentDetailsPage() {
         <div className="flex flex-col sm:flex-row gap-3">
           {canJoin && (
             <Button onClick={handleJoinTournament} disabled={isJoining}>
-              {isJoining ? "Joining..." : `Join Tournament (${tournament.entryFee})`}
+              {isJoining
+                ? "Joining..."
+                : `Join Tournament (${tournament.entryFee})`}
             </Button>
           )}
           {isParticipant && tournament.status === "active" && (
@@ -213,22 +247,36 @@ export default function TournamentDetailsPage() {
             <CardTitle>Tournament Details</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground mb-6">{tournament.description}</p>
+            <p className="text-muted-foreground mb-6">
+              {tournament.description}
+            </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Start Date</p>
-                  <p className="text-sm text-muted-foreground">{tournament.startDate}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {tournament.startDate}
+                  </p>
                 </div>
               </div>
-
+              {/* 
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Registration Deadline</p>
                   <p className="text-sm text-muted-foreground">{tournament.registrationDeadline}</p>
+                </div>
+              </div> */}
+
+              <div className="flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Prize Pool</p>
+                  <p className="text-sm text-muted-foreground">
+                    {tournament.prize}
+                  </p>
                 </div>
               </div>
 
@@ -237,16 +285,9 @@ export default function TournamentDetailsPage() {
                 <div>
                   <p className="text-sm font-medium">Participants</p>
                   <p className="text-sm text-muted-foreground">
-                    {tournament.currentParticipants} / {tournament.maxParticipants}
+                    {tournament.currentParticipants} /{" "}
+                    {tournament.maxParticipants}
                   </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Trophy className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Prize Pool</p>
-                  <p className="text-sm text-muted-foreground">{tournament.prize}</p>
                 </div>
               </div>
             </div>
@@ -261,7 +302,11 @@ export default function TournamentDetailsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm">Registration</span>
-                <Badge variant={tournament.status === "open" ? "default" : "secondary"}>
+                <Badge
+                  variant={
+                    tournament.status === "open" ? "default" : "secondary"
+                  }
+                >
                   {tournament.status === "open" ? "Open" : "Closed"}
                 </Badge>
               </div>
@@ -273,16 +318,22 @@ export default function TournamentDetailsPage() {
 
               <div className="flex justify-between items-center">
                 <span className="text-sm">Organizer</span>
-                <span className="font-medium text-xs truncate max-w-[150px]">{tournament.organizer}</span>
+                <span className="font-medium text-xs truncate max-w-[150px]">
+                  {tournament.organizer}
+                </span>
               </div>
 
               {isParticipant && (
                 <div className="mt-6 p-3 bg-muted rounded-md">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <span className="text-sm font-medium">You are registered</span>
+                    <span className="text-sm font-medium">
+                      You are registered
+                    </span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">You'll be notified when matches are scheduled</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    You'll be notified when matches are scheduled
+                  </p>
                 </div>
               )}
             </div>
@@ -297,11 +348,13 @@ export default function TournamentDetailsPage() {
           <TabsTrigger value="matches">Matches</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="bracket" className="mt-6">
+        <TabsContent value="bracket" className="mt-6 min-h-150">
           <Card>
             <CardHeader>
               <CardTitle>Tournament Bracket</CardTitle>
-              <CardDescription>View the current state of the tournament and upcoming matches</CardDescription>
+              <CardDescription>
+                View the current state of the tournament and upcoming matches
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <TournamentBracket tournament={tournament} />
@@ -309,12 +362,13 @@ export default function TournamentDetailsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="participants" className="mt-6">
+        <TabsContent value="participants" className="mt-6 min-h-150">
           <Card>
             <CardHeader>
               <CardTitle>Participants</CardTitle>
               <CardDescription>
-                {tournament.currentParticipants} out of {tournament.maxParticipants} spots filled
+                {tournament.currentParticipants} out of{" "}
+                {tournament.maxParticipants} spots filled
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -323,53 +377,153 @@ export default function TournamentDetailsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="matches" className="mt-6">
+        <TabsContent value="matches" className="mt-6 min-h-150">
           <Card>
             <CardHeader>
               <CardTitle>Matches</CardTitle>
-              <CardDescription>View scheduled and completed matches</CardDescription>
+              <CardDescription>
+                View scheduled, disputed, and completed matches
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {tournament.matches.length > 0 ? (
                 <div className="space-y-4">
-                  {tournament.matches.map((match) => (
-                    <div key={match.id} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium">Round {match.round}</span>
-                        <Badge variant={match.status === "completed" ? "outline" : "default"}>
-                          {match.status === "completed" ? "Completed" : "Scheduled"}
-                        </Badge>
-                      </div>
+                  {tournament.matches.map((match) => {
+                    const isUserParticipant =
+                      isParticipant &&
+                      (match.player1 === address || match.player2 === address);
 
-                      <div className="flex justify-between items-center py-2">
-                        <div className="text-sm truncate max-w-[40%]">{match.player1}</div>
-                        <div className="text-xs text-muted-foreground">vs</div>
-                        <div className="text-sm truncate max-w-[40%] text-right">{match.player2}</div>
-                      </div>
+                    const userIsJury = true; // Replace this with actual jury check
 
-                      {match.status === "completed" && (
-                        <div className="mt-2 text-sm text-muted-foreground">
-                          Winner: <span className="font-medium">{match.winner}</span>
+                    return (
+                      <div key={match.id} className="border rounded-lg p-4">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-sm font-medium">
+                            Round {match.round}
+                          </span>
+                          {match.status === "completed" && (
+                            <Badge
+                              variant="outline"
+                              className="bg-green-100 text-green-800"
+                            >
+                              Completed
+                            </Badge>
+                          )}
+                          {match.status === "pending" && (
+                            <Badge
+                              variant="outline"
+                              className="bg-yellow-100 text-yellow-800"
+                            >
+                              Pending Confirmation
+                            </Badge>
+                          )}
+                          {match.status === "disputed" && (
+                            <Badge
+                              variant="outline"
+                              className="bg-red-100 text-red-800"
+                            >
+                              Disputed
+                            </Badge>
+                          )}
+                          {match.status === "resolved" && (
+                            <Badge
+                              variant="outline"
+                              className="bg-purple-100 text-purple-800"
+                            >
+                              Resolved by Jury
+                            </Badge>
+                          )}
+                          {match.status === "scheduled" && (
+                            <Badge
+                              variant="outline"
+                              className="bg-blue-100 text-blue-800"
+                            >
+                              Scheduled
+                            </Badge>
+                          )}
                         </div>
-                      )}
 
-                      <div className="mt-3 flex justify-between items-center">
-                        <div className="text-xs text-muted-foreground">{match.scheduledTime}</div>
+                        <div className="flex justify-between items-center py-2">
+                          <div className="text-sm truncate max-w-[40%]">
+                            {match.player1}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            vs
+                          </div>
+                          <div className="text-sm truncate max-w-[40%] text-right">
+                            {match.player2}
+                          </div>
+                        </div>
 
-                        {isParticipant &&
-                          (match.player1 === address || match.player2 === address) &&
-                          match.status !== "completed" && (
-                            <Button size="sm" variant="outline" onClick={() => handleReportMatch(match)}>
-                              Report Result
+                        {match.winner && (
+                          <div className="mt-2 text-sm text-muted-foreground">
+                            Winner:{" "}
+                            <span className="font-medium">{match.winner}</span>
+                            {match.status === "resolved" && (
+                              <span className="ml-2 text-xs text-purple-600">
+                                (Jury Decision)
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {match.status === "pending" &&
+                          match.resolutionDeadline && (
+                            <div className="mt-1 text-xs text-yellow-600">
+                              Awaiting confirmation until{" "}
+                              {new Date(
+                                match.resolutionDeadline
+                              ).toLocaleString()}
+                            </div>
+                          )}
+
+                        <div className="mt-3 flex justify-between items-center">
+                          <div className="text-xs text-muted-foreground">
+                            {match.scheduledTime}
+                          </div>
+
+                          {isUserParticipant &&
+                            match.status === "scheduled" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleReportMatch(match)}
+                              >
+                                Report Result
+                              </Button>
+                            )}
+
+                          {isUserParticipant && match.status === "pending" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleReportMatch(match)}
+                            >
+                              Confirm Result
                             </Button>
                           )}
+
+                          {match.status === "disputed" && userIsJury && (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                // Jury decision handler logic here
+                              }}
+                            >
+                              Resolve Match
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground">No matches scheduled yet</p>
+                  <p className="text-muted-foreground">
+                    No matches scheduled yet
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -382,14 +536,14 @@ export default function TournamentDetailsPage() {
         onOpenChange={setMatchReportOpen}
         match={selectedMatch}
         onSubmit={(result) => {
-          console.log("Match result submitted:", result)
+          console.log("Match result submitted:", result);
           toast.success("Result submitted", {
-            description:  "Your match result has been submitted and is awaiting confirmation"
-            })
-          setMatchReportOpen(false)
+            description:
+              "Your match result has been submitted and is awaiting confirmation",
+          });
+          setMatchReportOpen(false);
         }}
       />
     </div>
-  )
+  );
 }
-
