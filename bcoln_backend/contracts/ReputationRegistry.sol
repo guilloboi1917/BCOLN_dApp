@@ -63,7 +63,7 @@ contract ReputationRegistry {
     // Values can be adapted
     function getStakeAmount(address player) external view returns (uint256) {
         if (reputations[player].isBanned) revert("Banned player");
-        if (reputations[player].score >= 50) return 0.5 ether;
+        if (reputations[player].score >= 50) return 5 ether;
         if (reputations[player].score < 0) return 2 ether;
         return 1 ether;
     }
