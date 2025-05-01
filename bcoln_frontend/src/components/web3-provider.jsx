@@ -23,6 +23,8 @@ export function Web3Provider({ children }) {
   const [address, setAddress] = useState(null)
   const [balance, setBalance] = useState("0")
 
+  const EXPECTED_CHAIN_ID = 1234n;
+
   const connect = async () => {
     try {
       if (!window.ethereum) {
@@ -31,12 +33,46 @@ export function Web3Provider({ children }) {
         });
         return;
       }
-  
+
+      // Force MetaMask to re-prompt permissions/account selection
+      // await window.ethereum.request({
+      //   method: "wallet_requestPermissions",
+      //   params: [{ eth_accounts: {} }],
+      // });
+        
       const ethProvider = new ethers.BrowserProvider(window.ethereum);
+      const network = await ethProvider.getNetwork();
+      console.log("Connected to network:", network);
+
+      // Wrong chain
+      if (network.chainId !== EXPECTED_CHAIN_ID) {
+        try {
+          await window.ethereum.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: "0x4D2" }], // 0x4D2 = 1234 in hex
+          });
+
+          return connect();
+        } catch (switchErr) {
+          toast.error("Wrong network", {
+            description: "Please switch to the Hardhat network in MetaMask.",
+          });
+          return;
+        }
+      }
+
+      // Network is correct — proceed
+      await window.ethereum.request({
+        method: "wallet_requestPermissions",
+        params: [{ eth_accounts: {} }],
+      });
+
       const accounts = await ethProvider.send("eth_requestAccounts", []);
       const userAddress = accounts[0];
       const balanceInWei = await ethProvider.getBalance(userAddress);
       const ethBalance = ethers.formatEther(balanceInWei);
+      console.log("ETH Balance:", ethBalance);
+      console.log("Wei Balance:", balanceInWei.toString());
   
       setAddress(userAddress);
       setBalance(parseFloat(ethBalance).toFixed(4));
@@ -57,6 +93,8 @@ export function Web3Provider({ children }) {
     setAddress(null);
     setBalance("0");
     setConnected(false);
+    localStorage.removeItem("walletConnected");
+
     toast.info("Wallet disconnected", {
       description: "Your wallet has been disconnected",
     });
