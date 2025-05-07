@@ -40,7 +40,8 @@ const formSchema = z.object({
   title: z.string().min(5, { message: "Title must be at least 5 characters" }),
   description: z.string().min(10, { message: "Description must be at least 10 characters" }),
   entryFee: z.string().min(1, { message: "Entry fee is required" }),
-  prize: z.string().min(1, { message: "Prize amount is required" }),
+  // prize: z.string().min(1, { message: "Prize amount is required" }),
+  prize: z.string().optional(),
   maxParticipants: z.string().min(1, { message: "Maximum participants is required" }),
   startDate: z.date({ required_error: "Start date is required" }),
 });

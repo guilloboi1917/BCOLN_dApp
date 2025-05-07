@@ -15,7 +15,7 @@ import { Wallet, Copy, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function WalletConnect({ className }) {
-    const { connected, address, balance, connect, disconnect } = useWeb3();
+    const { connected, connecting, address, balance, connect, disconnect } = useWeb3();
   const [copied, setCopied] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -89,9 +89,9 @@ export function WalletConnect({ className }) {
   }
 
   return (
-    <Button onClick={connect} className={cn("gap-2", className)}>
+    <Button onClick={connect} disabled={connecting} className={cn("gap-2", className)}>
       <Wallet className="h-4 w-4" />
-      <span>Connect Wallet</span>
+      <span>{connecting ? "Connecting..." : "Connect Wallet"}</span>
     </Button>
   );
 }

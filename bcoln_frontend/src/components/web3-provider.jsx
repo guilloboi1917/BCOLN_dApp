@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from "react"
 import { toast } from "sonner"
-import { ethers } from "ethers";
+import { ethers, parseEther, formatEther } from "ethers";
 
 // Create a context for Web3 functionality
 const Web3Context = createContext({
@@ -19,13 +19,17 @@ const Web3Context = createContext({
 export const useWeb3 = () => useContext(Web3Context)
 
 export function Web3Provider({ children }) {
+  const [connecting, setConnecting] = useState(false); 
   const [connected, setConnected] = useState(false)
   const [address, setAddress] = useState(null)
   const [balance, setBalance] = useState("0")
 
-  const EXPECTED_CHAIN_ID = 1234n;
+  const EXPECTED_CHAIN_ID = 31337n;
 
   const connect = async () => {
+    if (connecting) return; 
+    setConnecting(true);
+    
     try {
       if (!window.ethereum) {
         toast.error("MetaMask not detected", {
@@ -34,11 +38,11 @@ export function Web3Provider({ children }) {
         return;
       }
 
-      // Force MetaMask to re-prompt permissions/account selection
       // await window.ethereum.request({
       //   method: "wallet_requestPermissions",
       //   params: [{ eth_accounts: {} }],
       // });
+
         
       const ethProvider = new ethers.BrowserProvider(window.ethereum);
       const network = await ethProvider.getNetwork();
@@ -49,7 +53,7 @@ export function Web3Provider({ children }) {
         try {
           await window.ethereum.request({
             method: "wallet_switchEthereumChain",
-            params: [{ chainId: "0x4D2" }], // 0x4D2 = 1234 in hex
+            params: [{ chainId: "0x7A69" }], // 0x7A69 = 31337 in hex
           });
 
           return connect();
@@ -64,7 +68,7 @@ export function Web3Provider({ children }) {
       const accounts = await ethProvider.send("eth_requestAccounts", []);
       const userAddress = accounts[0];
       const balanceInWei = await ethProvider.getBalance(userAddress);
-      const ethBalance = ethers.formatEther(balanceInWei);
+      const ethBalance = formatEther(balanceInWei);
       console.log("ETH Balance:", ethBalance);
       console.log("Wei Balance:", balanceInWei.toString());
   
@@ -105,13 +109,13 @@ export function Web3Provider({ children }) {
     );
 
     const tx = await contract.joinTournament(tournamentId, {
-      value: ethers.parseEther(entryFeeEth.toString()),
+      value: parseEther(entryFeeEth.toString()),
     });
 
     await tx.wait();
 
     const newBalance = await signer.getBalance();
-    setBalance(ethers.formatEther(newBalance));
+    setBalance(formatEther(newBalance));
   }
 
   // Mock creating a tournament
@@ -120,21 +124,20 @@ export function Web3Provider({ children }) {
 
       const contractAddress = "YOUR_CONTRACT_ADDRESS"; // Replace with your contract address
       const contractABI = [
-        // Replace with your actual contract ABI
         {
           "inputs": [
-            { "internalType": "string", "name": "title", "type": "string" },
-            { "internalType": "string", "name": "description", "type": "string" },
-            { "internalType": "uint256", "name": "entryFee", "type": "uint256" },
-            { "internalType": "uint256", "name": "prize", "type": "uint256" },
-            { "internalType": "uint256", "name": "maxParticipants", "type": "uint256" },
-            { "internalType": "uint256", "name": "startDate", "type": "uint256" },
+            { "internalType": "string", "name": "_name", "type": "string" },
+            { "internalType": "string", "name": "_description", "type": "string" },
+            { "internalType": "uint256", "name": "_entryFee", "type": "uint256" },
+            // { "internalType": "uint256", "name": "prize", "type": "uint256" },
+            { "internalType": "uint256", "name": "_maxParticipants", "type": "uint256" },
+            { "internalType": "uint256", "name": "_startTime", "type": "uint256" }
           ],
           "name": "createTournament",
           "outputs": [],
           "stateMutability": "nonpayable",
-          "type": "function",
-        },
+          "type": "function"
+        }
       ];
     
       // Create contract instance
@@ -144,17 +147,20 @@ export function Web3Provider({ children }) {
     
       try {
         // Call the smart contract to create a tournament
+        console.log("Submitting tournament:", tournamentData);
         const tx = await contract.createTournament(
           tournamentData.title,
           tournamentData.description,
-          ethers.utils.parseEther(tournamentData.entryFee.toString()), // Convert to Wei
-          ethers.utils.parseEther(tournamentData.prize.toString()), // Convert to Wei
+          parseEther(tournamentData.entryFee.toString()), // Convert to Wei
+          // ethers.utils.parseEther(tournamentData.prize.toString()), // Convert to Wei
           tournamentData.maxParticipants,
           Math.floor(tournamentData.startDate.getTime() / 1000) // Convert to Unix timestamp
         );
+        console.log("Transaction submitted:", tx.hash);
     
         // Wait for transaction to be mined
         await tx.wait();
+        console.log("Transaction confirmed");
     
         toast.success("Tournament created successfully!", {
           description: "Your tournament has been created on the blockchain.",
@@ -220,6 +226,7 @@ export function Web3Provider({ children }) {
     <Web3Context.Provider
       value={{
         connected,
+        connecting,
         address,
         balance,
         connect,
