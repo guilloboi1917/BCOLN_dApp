@@ -24,6 +24,37 @@ contract MatchContractFactory {
         );
     }
 
+    function createTournamentMatch(
+        address player1,
+        address player2,
+        uint256 entryFee,
+        address tournamentContract,
+        uint256 tournamentId,
+        uint256 roundNumber,
+        uint256 matchIndex
+    ) external returns (address) {
+        // Clone new match contract
+        address matchAddress = clone(matchContractTemplate);
+        matches.push(matchAddress);
+
+        console.log("Tournament match created at: ", matchAddress);
+
+        // Initialize the match with tournament data
+        MatchContract(matchAddress).initialize(
+            msg.sender,       // creator
+            player1,          // player1
+            player2,          // player2
+            entryFee,         // entry fee
+            tournamentContract, // tournament contract
+            tournamentId,     // tournament ID
+            roundNumber,      // round number
+            matchIndex        // match index
+        );
+
+        emit MatchCreated(matchAddress, msg.sender);
+        return matchAddress;
+    }
+
     function createMatch(
         address player1,
         address player2,
@@ -40,7 +71,11 @@ contract MatchContractFactory {
             msg.sender, // creator
             player1, // player1
             player2, // player2
-            entryFee // entry fee
+            entryFee, // entry fee
+            address(0),
+            0,
+            0,
+            0
         );
 
         emit MatchCreated(matchAddress, msg.sender);

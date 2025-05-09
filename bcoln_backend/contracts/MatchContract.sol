@@ -10,6 +10,12 @@ contract MatchContract {
     address public creator; // address of the creator who initialized this contract
     bool public initialized;
 
+    address public tournamentContract;
+    uint256 public tournamentId;
+    uint256 public roundNumber;
+    uint256 public matchIndex;
+    bool public isTournamentMatch;
+
     ReputationRegistry public immutable reputationRegistry;
 
     // Match states
@@ -101,7 +107,11 @@ contract MatchContract {
         address _creator,
         address _player1,
         address _player2,
-        uint256 _entryFee
+        uint256 _entryFee,
+        address _tournamentContract,
+        uint256 _tournamentId,       
+        uint256 _roundNumber,        
+        uint256 _matchIndex          
     ) external {
         require(!initialized, "Already initialized");
 
@@ -113,6 +123,13 @@ contract MatchContract {
         status = MatchStatus.Pending;
         currentMatch.player1Joined = false;
         currentMatch.player2Joined = false;
+        if (_tournamentContract != address(0)) {
+            tournamentContract = _tournamentContract;
+            tournamentId = _tournamentId;
+            roundNumber = _roundNumber;
+            matchIndex = _matchIndex;
+            isTournamentMatch = true;
+        }
 
         initialized = true;
 
@@ -154,15 +171,13 @@ contract MatchContract {
         if (msg.sender == currentMatch.player1) {
             require(
                 msg.value ==
-                    reputationRegistry.getStakeAmount(msg.sender) *
-                        currentMatch.entryFee
+                    reputationRegistry.getStakeAmount(msg.sender),  "Incorrect stake amount for player 1"
             );
             currentMatch.player1Commit = hashedCommitment;
         } else {
             require(
                 msg.value ==
-                    reputationRegistry.getStakeAmount(msg.sender) *
-                        currentMatch.entryFee
+                    reputationRegistry.getStakeAmount(msg.sender),  "Incorrect stake amount for player 2"
             );
             currentMatch.player2Commit = hashedCommitment;
         }
@@ -197,13 +212,16 @@ contract MatchContract {
             require(commitment == currentMatch.player1Commit, "Invalid reveal");
             currentMatch.player1Result = result ? "player1_won" : "player2_won"; // By doing it like this, players don't need to know if they are player1 or player2
             currentMatch.player1Salt = salt;
+            console.log("Player 1 revealed");
         } else {
             require(commitment == currentMatch.player2Commit, "Invalid reveal");
             currentMatch.player2Result = result ? "player2_won" : "player1_won"; // vice versa
             currentMatch.player2Salt = salt;
+            console.log("Player 2 revealed");
         }
 
         emit ResultRevealed(msg.sender);
+        console.log("Both revealed");
 
         // Check if both revealed
         if (
@@ -212,9 +230,12 @@ contract MatchContract {
         ) {
             if (
                 keccak256(abi.encodePacked(currentMatch.player1Result)) ==
-                keccak256(abi.encodePacked(currentMatch.player2Result))
+                keccak256(abi.encodePacked(currentMatch.player2Result)) 
             ) {
-                _resolveMatch(msg.sender); // Same result
+                if(keccak256(abi.encodePacked(currentMatch.player2Result)) == keccak256(abi.encodePacked("player2_won")))
+                    _resolveMatch(currentMatch.player2); // Same result
+                else 
+                    _resolveMatch(currentMatch.player1);
             } else {
                 status = MatchStatus.Dispute;
                 emit DisputeInitiated();
@@ -277,8 +298,44 @@ contract MatchContract {
         reputationRegistry.updateReputation(winner, REP_WIN, false);
         reputationRegistry.updateReputation(loser, REP_TRUTHFUL, false);
 
+        // Report result to tournament if this is a tournament match
+        if (isTournamentMatch) {
+            // Call the tournament contract to report the match result
+            // We use low-level call to handle potential errors
+
+             console.log("Tournament details: id=", tournamentId);
+
+            (bool success, bytes memory returnData) = address(tournamentContract).call(
+                abi.encodeWithSignature(
+                    "reportMatchResult(uint256,uint256,uint256,address)",
+                    tournamentId,
+                    roundNumber,
+                    matchIndex,
+                    winner
+                )
+            );
+            if (!success) {
+                // This will give you the revert reason in the console if available
+                console.log("Failed to report match to tournament");
+                if (returnData.length > 0) {
+                    // Extract the revert reason
+                    assembly {
+                        let returndata_size := mload(returnData)
+                        revert(add(32, returnData), returndata_size)
+                    }
+                }
+            }
+            // If reporting to tournament fails, we still want to pay the winner
+            if (!success) {
+                console.log("Failed to report match to tournament");
+            }
+        }
+        else{
+            // Only pay winner directly for non-tournament matches
+            payable(winner).transfer(currentMatch.entryFee * 2);
+        }
+
         // Payout
-        payable(winner).transfer(currentMatch.entryFee * 2);
         emit MatchResolved(winner);
     }
 
@@ -292,6 +349,33 @@ contract MatchContract {
 
         reputationRegistry.updateReputation(liar, REP_LIED, false);
 
+        // Report result to tournament if this is a tournament match
+        if (isTournamentMatch) {
+            // Call the tournament contract to report the match result
+            (bool success, ) = tournamentContract.call(
+                abi.encodeWithSignature(
+                    "reportMatchResult(uint256,uint256,uint256,address)",
+                    tournamentId,
+                    roundNumber,
+                    matchIndex,
+                    winner
+                )
+            );
+            // If reporting to tournament fails, we still want to pay the winner
+            if (!success) {
+                console.log("Failed to report match to tournament");
+            }
+        }
+        else{
+
+        // Payout for winners in a direct match
+            payable(winner).transfer(
+                currentMatch.entryFee *
+                    2 -
+                    (JURY_REWARD * currentMatch.juryPool.length)
+            );
+        }
+
         // Reward jurors
         for (uint i = 0; i < currentMatch.juryPool.length; i++) {
             payable(currentMatch.juryPool[i]).transfer(JURY_REWARD); // pay out money for voting
@@ -304,12 +388,27 @@ contract MatchContract {
             );
         }
 
-        // Payout
-        payable(winner).transfer(
-            currentMatch.entryFee *
-                2 -
-                (JURY_REWARD * currentMatch.juryPool.length)
-        );
+       
         emit MatchResolved(winner);
     }
+    // In MatchContract.sol - modify the collectTournamentFunds function
+function collectTournamentFunds() external returns (uint256) {
+    require(msg.sender == tournamentContract, "Only tournament can collect funds");
+    require(status == MatchStatus.Completed, "Match not completed");
+    require(isTournamentMatch, "Not a tournament match");
+    
+    uint256 remainingFunds = address(this).balance;
+    console.log("Remaining Funds: ", remainingFunds);
+
+    console.log("Tournament contract: ", tournamentContract);
+    
+    if (remainingFunds > 0) {
+        // Replace transfer with call which forwards all available gas
+        (bool success, ) = payable(tournamentContract).call{value: remainingFunds}("");
+        require(success, "Transfer failed");
+    }
+    
+    console.log("Transferred to tournament contract");
+    return remainingFunds;
+}
 }
