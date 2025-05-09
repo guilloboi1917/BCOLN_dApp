@@ -36,6 +36,18 @@ contract TournamentContract {
         uint256 totalPrize;
     }
 
+    struct TournamentSummary {
+    uint256 id;
+    string name;
+    string description;
+    uint256 entryFee;
+    uint256 maxParticipants;
+    uint256 registeredParticipants;
+    uint256 startTime;
+    TournamentStatus status;
+    uint256 totalPrize;
+    }   
+
     // Storage
     mapping(uint256 => Tournament) public tournaments;
     uint256 public tournamentCount;
@@ -369,6 +381,28 @@ contract TournamentContract {
             tournament.totalPrize
         );
     }
+
+    function getAllTournaments() external view returns (TournamentSummary[] memory) {
+    TournamentSummary[] memory summaries = new TournamentSummary[](tournamentCount);
+
+    for (uint256 i = 0; i < tournamentCount; i++) {
+        Tournament storage t = tournaments[i];
+
+        summaries[i] = TournamentSummary({
+            id: i,
+            name: t.name,
+            description: t.description,
+            entryFee: t.entryFee,
+            maxParticipants: t.maxParticipants,
+            registeredParticipants: t.registeredParticipants,
+            startTime: t.startTime,
+            status: t.status,
+            totalPrize: t.totalPrize
+        });
+    }
+
+    return summaries;
+}
     
     /**
      * @dev Get list of participants for a tournament

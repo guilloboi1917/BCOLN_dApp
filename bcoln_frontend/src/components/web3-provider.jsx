@@ -4,6 +4,8 @@ import { createContext, useContext, useState, useEffect } from "react"
 import { toast } from "sonner"
 import { ethers, parseEther, formatEther } from "ethers";
 
+import TournamentContractData from '../../lib/contracts/TournamentContract.json'; 
+
 // Create a context for Web3 functionality
 const Web3Context = createContext({
   connected: false,
@@ -122,25 +124,9 @@ export function Web3Provider({ children }) {
   const createTournament = async (tournamentData) => {
     if (!connected) throw new Error("Wallet not connected")
 
-      const contractAddress = "YOUR_CONTRACT_ADDRESS"; // Replace with your contract address
-      const contractABI = [
-        {
-          "inputs": [
-            { "internalType": "string", "name": "_name", "type": "string" },
-            { "internalType": "string", "name": "_description", "type": "string" },
-            { "internalType": "uint256", "name": "_entryFee", "type": "uint256" },
-            // { "internalType": "uint256", "name": "prize", "type": "uint256" },
-            { "internalType": "uint256", "name": "_maxParticipants", "type": "uint256" },
-            { "internalType": "uint256", "name": "_startTime", "type": "uint256" }
-          ],
-          "name": "createTournament",
-          "outputs": [],
-          "stateMutability": "nonpayable",
-          "type": "function"
-        }
-      ];
-    
-      // Create contract instance
+      const contractAddress = TournamentContractData.address
+      const contractABI = TournamentContractData.abi
+
       const ethProvider = new ethers.BrowserProvider(window.ethereum);
       const signer = await ethProvider.getSigner();
       const contract = new ethers.Contract(contractAddress, contractABI, signer);
@@ -165,6 +151,9 @@ export function Web3Provider({ children }) {
         toast.success("Tournament created successfully!", {
           description: "Your tournament has been created on the blockchain.",
         });
+
+        const count = await contract.getAllTournaments()
+        console.log("TOURNAMEN COUNT", count)
       } catch (error) {
         console.error("Error creating tournament:", error);
         toast.error("Failed to create tournament", {

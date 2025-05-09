@@ -1,5 +1,6 @@
 // scripts/deploy.js
 const { ethers } = require("hardhat");
+const exportFrontendArtifacts = require("./exportFrontendArtifacts");
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -18,6 +19,8 @@ async function main() {
   await tournament.waitForDeployment();
   const tournamentAddress = await tournament.getAddress();
   console.log(`TournamentContract deployed to: ${tournamentAddress}`);
+
+  await exportFrontendArtifacts(tournament, factory);
 }
 
 main().catch((error) => {

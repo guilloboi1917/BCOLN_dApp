@@ -1,80 +1,56 @@
 ﻿"use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TournamentCard } from "@/components/tournament-card"
 import { Search, Filter } from "lucide-react"
+import { ethers } from "ethers"
+
+import TournamentContractData from '../../../lib/contracts/TournamentContract.json'; 
 
 export default function TournamentsPage() {
-  // Mock data for tournaments
-  const allTournaments = [
-    {
-      id: "1",
-      title: "Crypto Masters 2025",
-      description: "The biggest blockchain gaming tournament of the year",
-      entryFee: "0.05 ETH",
-      prize: "10 ETH",
-      participants: 8,
-      startDate: "May 15, 2025",
-      status: "active",
-    },
-    {
-      id: "2",
-      title: "Web3 Poker Championship",
-      description: "Test your poker skills against the best players",
-      entryFee: "0.1 ETH",
-      prize: "20 ETH",
-      participants: 8,
-      startDate: "June 1, 2025",
-      status: "open",
-    },
-    {
-      id: "3",
-      title: "NFT Creators Showdown",
-      description: "A creative competition for NFT artists",
-      entryFee: "0.02 ETH",
-      prize: "5 ETH",
-      participants: 8,
-      startDate: "April 20, 2025",
-      status: "open",
-    },
-    {
-      id: "4",
-      title: "DeFi Trading Cup",
-      description: "Compete for the highest trading returns",
-      entryFee: "0.2 ETH",
-      prize: "30 ETH",
-      participants: 8,
-      startDate: "July 10, 2025",
-      status: "upcoming",
-    },
-    {
-      id: "5",
-      title: "Blockchain Hackathon",
-      description: "Build innovative solutions in 48 hours",
-      entryFee: "0.01 ETH",
-      prize: "15 ETH",
-      participants: 8,
-      startDate: "August 5, 2025",
-      status: "upcoming",
-    },
-    {
-      id: "6",
-      title: "Crypto Chess Tournament",
-      description: "Strategic battles on the blockchain",
-      entryFee: "0.03 ETH",
-      prize: "8 ETH",
-      participants: 8,
-      startDate: "March 15, 2025",
-      status: "completed",
-    },
-  ]
-
+  const [tournaments, setTournaments] = useState([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
 
-  const filteredTournaments = allTournaments.filter((tournament) => {
+  useEffect(() => {
+    const fetchTournaments = async () => {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum)
+        const contract = new ethers.Contract(
+          TournamentContractData.address,
+          TournamentContractData.abi,
+          await provider.getSigner()
+        )
+
+        const data = await contract.getAllTournaments()
+        const parsed = data.map((t) => ({
+          id: t.id.toString(),
+          title: t.name,
+          description: t.description,
+          entryFee: ethers.formatEther(t.entryFee),
+          prize: ethers.formatEther(t.totalPrize),
+          participants: t.maxParticipants,
+          startDate: new Date(Number(t.startTime) * 1000).toLocaleDateString(),
+          status: mapStatus(t.status),
+        }))
+        console.log("Tournaments", parsed)
+        setTournaments(parsed)
+      } catch (err) {
+        console.error("Failed to fetch tournaments", err)
+      }
+    }
+
+    fetchTournaments()
+  }, [])
+
+  const mapStatus = (statusId) => {
+    return ["open", "active", "completed", "cancelled"][statusId] || "unknown"
+  }
+
+
+  const filteredTournaments = tournaments.filter((tournament) => {
     const matchesSearch = tournament.title.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === "all" || tournament.status === statusFilter
     return matchesSearch && matchesStatus
