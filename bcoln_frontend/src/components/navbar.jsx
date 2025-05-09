@@ -4,11 +4,16 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { WalletConnect } from "@/components/wallet-connect"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { ThemeToggle } from "@/components/theme-toggle"
+import { WalletConnect } from "@/components/wallet-connect";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
-import { Trophy, Menu } from "lucide-react";
+import { Zap, Menu } from "lucide-react";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -43,7 +48,7 @@ export function Navbar() {
       <div className="mx-auto w-full max-w-screen-2xl px-4 flex h-16 items-center justify-between">
         <div className="flex items-center gap-6 md:gap-10">
           <Link href="/" className="flex items-center space-x-2">
-            <Trophy className="h-6 w-6" />
+            <Zap className="h-6 w-6" />
             <span className="font-bold inline-block">Zeus</span>
           </Link>
 
@@ -64,7 +69,9 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="hidden md:flex"><WalletConnect /></div>
+          <div className="hidden md:flex">
+            <WalletConnect />
+          </div>
           <ThemeToggle />
 
           <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -75,27 +82,28 @@ export function Navbar() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right">
-              <div className="flex flex-col gap-4 py-4">
+              <SheetTitle className="sr-only">Navigation Menu</SheetTitle>{" "}
+              <div className="flex flex-col gap-4 px-4 py-4">
                 <Link
                   href="/"
                   className="flex items-center space-x-2"
                   onClick={() => setIsOpen(false)}
                 >
-                  <Trophy className="h-6 w-6" />
+                  <Zap className="h-6 w-6" />
                   <span className="font-bold">Zeus</span>
                 </Link>
 
-                <div className="flex flex-col space-y-3">
+                <div className="flex flex-col space-y-2">
                   {routes.map((route) => (
                     <Link
                       key={route.href}
                       href={route.href}
                       onClick={() => setIsOpen(false)}
                       className={cn(
-                        "text-sm font-medium transition-colors hover:text-primary",
+                        "block px-4 py-2 rounded-md text-sm font-medium transition-colors",
                         route.active
-                          ? "text-foreground"
-                          : "text-muted-foreground"
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
                       )}
                     >
                       {route.label}
@@ -103,7 +111,9 @@ export function Navbar() {
                   ))}
                 </div>
 
-                <div className="mt-4"><WalletConnect /></div>
+                <div className="mt-4 px-4 py-2">
+                  <WalletConnect />
+                </div>
               </div>
             </SheetContent>
           </Sheet>
