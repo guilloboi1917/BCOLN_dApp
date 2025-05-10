@@ -26,6 +26,11 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
+import { connectTournamentContract } from "@/lib/connectTournamentContract";
+import { connectMatchContract } from "@/lib/connectMatchContract";
+import { ethers } from "ethers";
+import MatchContractJson from "@/contracts/MatchContract.json";
+
 
 export default function TournamentDetailsPage() {
   const { id } = useParams();
@@ -35,75 +40,65 @@ export default function TournamentDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Mock API call to fetch tournament details
     const fetchTournament = async () => {
       setIsLoading(true);
       try {
-        // In a real app, this would be an API call to your backend or directly to the blockchain
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const contract = await connectTournamentContract();
+        if (!contract) return;
+  
+        const tournamentId = Number(id);
+        const details = await contract.getTournamentDetails(tournamentId);
+        const participants = await contract.getTournamentParticipants(tournamentId);
 
-        // Mock data
+        // Hardcoded match address for now
+        const matchAddresses = ["0xeEBe00Ac0756308ac4AaBfD76c05c4F3088B8883"];
+        const matches = [];
+
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+
+        for (const addr of matchAddresses) {
+          const matchContract = new ethers.Contract(addr, MatchContractJson.abi, signer);
+          const current = await matchContract.currentMatch();
+          const statusEnum = await matchContract.getMatchStatus();
+          const statusText = ["pending", "commit", "reveal", "dispute", "completed"][statusEnum];
+
+          matches.push({
+            id: addr.slice(0, 8),
+            round: 1,
+            player1: current.player1,
+            player2: current.player2,
+            winner: current.player1Result || current.player2Result || null,
+            status: statusText,
+            scheduledTime: new Date(Number(current.revealDeadline) * 1000).toLocaleString(),
+            resolutionDeadline: new Date(Number(current.revealDeadline) * 1000).toLocaleString(),
+            juryDecision: null,
+          });
+        }
+  
         setTournament({
-          id,
-          title: "Crypto Masters 2025",
-          description:
-            "The biggest blockchain gaming tournament of the year. Compete against the best players from around the world in this prestigious event.",
-          entryFee: "0.05 ETH",
-          prize: "10 ETH",
-          maxParticipants: 8,
-          currentParticipants: 8,
-          startDate: "May 15, 2025",
-          registrationDeadline: "May 10, 2025",
-          status: "active",
-          organizer: "0x1234...5678",
-          participants: Array(8)
-            .fill(0)
-            .map((_, i) => ({
-              address: `0x${Math.random()
-                .toString(16)
-                .substring(2, 10)}...${Math.random()
-                .toString(16)
-                .substring(2, 6)}`,
-              joinedAt: new Date(
-                Date.now() - Math.random() * 10000000000
-              ).toISOString(),
-            })),
-          matches: [
-            {
-              id: "m1",
-              round: 1,
-              player1: "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
-              player2: "0x5678...9012",
-              winner: null,
-              status: "scheduled",
-              scheduledTime: "May 15, 2025, 12:00 PM",
-              resolutionDeadline: "May 17, 2025, 12:00 PM",
-              juryDecision: null,
-            },
-            {
-              id: "m2",
-              round: 1,
-              player1: "0x2345...6789",
-              player2: "0x6789...0123",
-              winner: "0x2345...6789",
-              status: "disputed",
-              scheduledTime: "May 15, 2025, 1:00 PM",
-              resolutionDeadline: "May 17, 2025, 12:00 PM",
-              juryDecision: "0x2345...6789", // winner's address if resolved by jury
-            },
-            {
-              id: "m3",
-              round: 1,
-              player1: "0x1234...5678",
-              player2: "0x5678...9012",
-              winner: null,
-              status: "completed",
-              scheduledTime: "May 15, 2025, 12:00 PM",
-              resolutionDeadline: "May 17, 2025, 12:00 PM",
-              juryDecision: null,
-            },
-          ],
-        });
+          id: tournamentId,
+          title: details.name,
+          description: details.description,
+          entryFee: `${ethers.formatEther(details.entryFee)} ETH`,
+          prize: `${ethers.formatEther(details.totalPrize)} ETH`,
+          maxParticipants: Number(details.maxParticipants),
+          currentParticipants: Number(details.registeredParticipants),
+          startDate: new Date(Number(details.startTime) * 1000).toDateString(),
+          registrationDeadline: "N/A",
+          status:
+            details.status === 0
+              ? "open"
+              : details.status === 1
+              ? "active"
+              : "completed",
+          organizer: "0x...", // replace or ignore for now
+          participants: participants.map((addr) => ({
+            address: addr,
+            joinedAt: new Date().toISOString(),
+          })),
+          matches, // real match data
+        });    
       } catch (error) {
         console.error("Error fetching tournament:", error);
         toast.error("Error loading tournament", {
@@ -113,9 +108,9 @@ export default function TournamentDetailsPage() {
         setIsLoading(false);
       }
     };
-
+  
     fetchTournament();
-  }, [id]);
+  }, [id]);  
 
   const handleJoinTournament = async () => {
     if (!connected) {
@@ -124,17 +119,27 @@ export default function TournamentDetailsPage() {
       });
       return;
     }
-
+  
     setIsJoining(true);
     try {
-      // This would call the actual contract method in a real implementation
-      await joinTournament(id, tournament.entryFee);
-
+      const contract = await connectTournamentContract();
+      if (!contract) return;
+  
+      const entryFeeInWei = ethers.parseEther(
+        tournament.entryFee.replace(" ETH", "")
+      );
+  
+      const tx = await contract.registerForTournament(Number(id), {
+        value: entryFeeInWei,
+      });
+  
+      await tx.wait();
+  
       toast.success("Successfully joined!", {
         description: "You have successfully joined the tournament",
       });
-
-      // Update the tournament state to reflect the new participant
+  
+      // Update UI with new participant
       setTournament((prev) => ({
         ...prev,
         currentParticipants: prev.currentParticipants + 1,
@@ -155,7 +160,103 @@ export default function TournamentDetailsPage() {
     } finally {
       setIsJoining(false);
     }
+  };  
+
+  const handleReportMatch = async (match) => {
+    const matchAddress = match.id.length === 42 ? match.id : "0xeEBe00Ac0756308ac4AaBfD76c05c4F3088B8883"; // fallback if using short id
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const matchContract = new ethers.Contract(
+      matchAddress,
+      MatchContractJson.abi,
+      signer
+    );
+  
+    try {
+      const status = await matchContract.getMatchStatus();
+  
+      if (status === 1) {
+        const salt = ethers.hexlify(ethers.randomBytes(32));
+        const result = true;
+        const commitment = ethers.keccak256(
+          ethers.toUtf8Bytes("I_report_truth" + salt.slice(2))
+        );
+      
+        const registryAddress = await matchContract.reputationRegistry();
+        const registry = new ethers.Contract(registryAddress, MatchContractJson.abi, signer);
+        const userAddress = await signer.getAddress();
+        const stake = await registry.getStakeAmount(userAddress);
+      
+        const tx = await matchContract.commitResult(commitment, {
+          value: stake,
+        });
+      
+        await tx.wait();
+        toast.success("Commit submitted");
+      
+        localStorage.setItem(`match-${matchAddress}-salt`, salt);
+        localStorage.setItem(`match-${matchAddress}-result`, result.toString());
+      } else if (status === 2) {
+        // REVEAL PHASE
+        const salt = localStorage.getItem(`match-${matchAddress}-salt`);
+        const result = localStorage.getItem(`match-${matchAddress}-result`) === "true";
+  
+        if (!salt) throw new Error("No stored commitment salt");
+  
+        const tx = await matchContract.revealResult(salt, result);
+        await tx.wait();
+        toast.success("Reveal submitted");
+      } else {
+        toast.info("Match is not in commit or reveal phase.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error reporting result", {
+        description: err.message || "Transaction failed.",
+      });
+    }
   };
+  
+  const handleJoinJury = async (match) => {
+    try {
+      const matchAddress = match.id.length === 42 ? match.id : "0xeEBe00Ac0756308ac4AaBfD76c05c4F3088B8883";
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const matchContract = new ethers.Contract(matchAddress, MatchContractJson.abi, signer);
+  
+      const tx = await matchContract.joinJury({
+        value: ethers.parseEther("0.1"),
+      });
+      await tx.wait();
+  
+      toast.success("Joined as juror!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not join jury", {
+        description: err.message,
+      });
+    }
+  };
+  
+  const handleVoteAsJuror = async (match, vote) => {
+    try {
+      const matchAddress = match.id.length === 42 ? match.id : "0xeEBe00Ac0756308ac4AaBfD76c05c4F3088B8883";
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const matchContract = new ethers.Contract(matchAddress, MatchContractJson.abi, signer);
+  
+      const tx = await matchContract.voteAsJuror(vote);
+      await tx.wait();
+  
+      toast.success("Vote submitted!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Voting failed", {
+        description: err.message,
+      });
+    }
+  };
+  
 
   if (isLoading) {
     return (
@@ -392,7 +493,8 @@ export default function TournamentDetailsPage() {
                       isParticipant &&
                       (match.player1 === address || match.player2 === address);
 
-                    const userIsJury = true; // Replace this with actual jury check
+                      const isUserJuror = match.juryPool?.includes(address);
+
 
                     return (
                       <div key={match.id} className="border rounded-lg p-4">
@@ -502,17 +604,32 @@ export default function TournamentDetailsPage() {
                             </Button>
                           )}
 
-                          {match.status === "disputed" && userIsJury && (
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => {
-                                // Jury decision handler logic here
-                              }}
-                            >
-                              Resolve Match
-                            </Button>
+                          {match.status === "disputed" && (
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleJoinJury(match)}
+                              >
+                                Join Jury
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleVoteAsJuror(match, 1)} // vote for player1
+                              >
+                                Vote Player 1
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleVoteAsJuror(match, 2)} // vote for player2
+                              >
+                                Vote Player 2
+                              </Button>
+                            </div>
                           )}
+
                         </div>
                       </div>
                     );
