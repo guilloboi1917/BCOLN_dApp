@@ -87,9 +87,9 @@ export default function TournamentDetailsPage() {
           startDate: new Date(Number(details.startTime) * 1000).toDateString(),
           registrationDeadline: "N/A",
           status:
-            details.status === 0
+            details.status === 0n
               ? "open"
-              : details.status === 1
+              : details.status === 1n
               ? "active"
               : "completed",
           organizer: "0x...", // replace or ignore for now
