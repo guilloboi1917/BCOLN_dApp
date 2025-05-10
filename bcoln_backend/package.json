@@ -22,7 +22,6 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "@helia/unixfs": "^5.0.0",
-    "helia": "^5.3.0"
+    "ipfs-http-client": "^60.0.1"
   }
 }

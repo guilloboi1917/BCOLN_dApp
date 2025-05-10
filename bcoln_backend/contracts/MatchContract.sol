@@ -50,6 +50,7 @@ contract MatchContract {
         address[] juryPool;
         mapping(address => uint256) juryVotes;
         uint256 revealDeadline;
+        string resultCID;
     }
 
     // For some reason we need to take this out of the struct otherwise it won't compile due to stack depth
@@ -391,24 +392,38 @@ contract MatchContract {
        
         emit MatchResolved(winner);
     }
-    // In MatchContract.sol - modify the collectTournamentFunds function
-function collectTournamentFunds() external returns (uint256) {
-    require(msg.sender == tournamentContract, "Only tournament can collect funds");
-    require(status == MatchStatus.Completed, "Match not completed");
-    require(isTournamentMatch, "Not a tournament match");
-    
-    uint256 remainingFunds = address(this).balance;
-    console.log("Remaining Funds: ", remainingFunds);
 
-    console.log("Tournament contract: ", tournamentContract);
-    
-    if (remainingFunds > 0) {
-        // Replace transfer with call which forwards all available gas
-        (bool success, ) = payable(tournamentContract).call{value: remainingFunds}("");
-        require(success, "Transfer failed");
+    function finalizeMatchWithCID(address winner, string calldata _cid) external onlyFactory {
+        require(status != MatchStatus.Completed, "Already finalized");
+
+        if (status == MatchStatus.Dispute) {
+            _resolveDispute(winner);
+        } else {
+            _resolveMatch(winner);
+        }
+
+        currentMatch.resultCID = _cid;
     }
-    
-    console.log("Transferred to tournament contract");
-    return remainingFunds;
-}
+
+
+    // In MatchContract.sol - modify the collectTournamentFunds function
+    function collectTournamentFunds() external returns (uint256) {
+        require(msg.sender == tournamentContract, "Only tournament can collect funds");
+        require(status == MatchStatus.Completed, "Match not completed");
+        require(isTournamentMatch, "Not a tournament match");
+        
+        uint256 remainingFunds = address(this).balance;
+        console.log("Remaining Funds: ", remainingFunds);
+
+        console.log("Tournament contract: ", tournamentContract);
+        
+        if (remainingFunds > 0) {
+            // Replace transfer with call which forwards all available gas
+            (bool success, ) = payable(tournamentContract).call{value: remainingFunds}("");
+            require(success, "Transfer failed");
+        }
+        
+        console.log("Transferred to tournament contract");
+        return remainingFunds;
+    }
 }
