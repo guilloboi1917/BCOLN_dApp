@@ -50,26 +50,39 @@ export default function TournamentDetailsPage() {
 
         console.log("ID", id);
 
-        const tournamentData = await contract.getTournamentDetails(id);
-        const [totalRounds, currentRound, matches] = await contract.getTournamentBracket(id);
+        const [
+          name,
+          description,
+          entryFee,
+          maxParticipants,
+          registeredParticipants,
+          startTime,
+          status,
+          currentRound,
+          totalRounds,
+          totalPrize
+        ] = await contract.getTournamentDetails(id);
+        
+        const participants = await contract.getTournamentParticipants(id);
+        const [bracketTotalRounds, bracketCurrentRound, matches] = await contract.getTournamentBracket(id);
+        
 
         const parsedTournament = {
-          title: tournamentData.name,
-          description: tournamentData.description,
-          entryFee: ethers.formatEther(tournamentData.entryFee),
-          prize: ethers.formatEther(tournamentData.totalPrize),
-          maxParticipants: tournamentData.maxParticipants,
-          registeredParticipants: tournamentData.registeredParticipants,
-          participantList: tournamentData.participants,
-          startDate: new Date(
-            Number(tournamentData.startTime) * 1000
-          ).toLocaleDateString(),
-          status: mapStatus(tournamentData.status),
-          currentRound: tournamentData.currentRound,
-          totalRounds: tournamentData.totalRounds,
-          totalPrize: ethers.formatEther(tournamentData.totalPrize),
+          title: name,
+          description,
+          entryFee: ethers.formatEther(entryFee),
+          prize: ethers.formatEther(totalPrize),
+          maxParticipants,
+          registeredParticipants,
+          participantList: participants, // 👈 no formatting here!
+          startDate: new Date(Number(startTime) * 1000).toLocaleDateString(),
+          status: mapStatus(status),
+          currentRound,
+          totalRounds,
+          totalPrize: ethers.formatEther(totalPrize),
           matches
         };
+        
 
         console.log("LIST", parsedTournament.participantList);
 
