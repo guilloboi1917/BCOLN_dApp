@@ -118,6 +118,8 @@ contract TournamentContract {
         newTournament.status = TournamentStatus.Registration;
         newTournament.registeredParticipants = 0;
         newTournament.totalPrize = _maxParticipants * _entryFee;
+
+        newTournament.participants = new address[](0);
         
          // Calculate total rounds needed based on participant count
         if (_maxParticipants == 4) {
@@ -384,7 +386,8 @@ contract TournamentContract {
         TournamentStatus status,
         uint256 currentRound,
         uint256 totalRounds,
-        uint256 totalPrize
+        uint256 totalPrize,
+        address[] memory participants
     ) {
         Tournament storage tournament = tournaments[_tournamentId];
         
@@ -398,7 +401,8 @@ contract TournamentContract {
             tournament.status,
             tournament.currentRound,
             tournament.totalRounds,
-            tournament.totalPrize
+            tournament.totalPrize,
+            tournament.participants
         );
     }
 
