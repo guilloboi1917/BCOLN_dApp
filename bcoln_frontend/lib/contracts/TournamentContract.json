@@ -1,5 +1,5 @@
 {
-  "address": "0x0B306BF915C4d645ff596e518fAf3F9669b97016",
+  "address": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f",
   "abi": [
     {
       "inputs": [
@@ -66,6 +66,37 @@
         }
       ],
       "name": "MatchFundsCollected",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "tournamentId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "roundNumber",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "matchIndex",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "winner",
+          "type": "address"
+        }
+      ],
+      "name": "MatchResultRecorded",
       "type": "event"
     },
     {
@@ -267,6 +298,62 @@
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_tournamentId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getAllTournamentMatches",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "matchAddress",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "player1",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "player2",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "winner",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "roundNumber",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "matchIndex",
+              "type": "uint256"
+            },
+            {
+              "internalType": "enum MatchContract.MatchStatus",
+              "name": "status",
+              "type": "uint8"
+            }
+          ],
+          "internalType": "struct TournamentContract.MatchInfo[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "getAllTournaments",
       "outputs": [
@@ -337,6 +424,133 @@
           "internalType": "uint256",
           "name": "_roundNumber",
           "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_matchIndex",
+          "type": "uint256"
+        }
+      ],
+      "name": "getMatchInfo",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "matchAddress",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "player1",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "player2",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "winner",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "roundNumber",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "matchIndex",
+              "type": "uint256"
+            },
+            {
+              "internalType": "enum MatchContract.MatchStatus",
+              "name": "status",
+              "type": "uint8"
+            }
+          ],
+          "internalType": "struct TournamentContract.MatchInfo",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_tournamentId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_roundNumber",
+          "type": "uint256"
+        }
+      ],
+      "name": "getRoundMatches",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "matchAddress",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "player1",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "player2",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "winner",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "roundNumber",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "matchIndex",
+              "type": "uint256"
+            },
+            {
+              "internalType": "enum MatchContract.MatchStatus",
+              "name": "status",
+              "type": "uint8"
+            }
+          ],
+          "internalType": "struct TournamentContract.MatchInfo[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_tournamentId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_roundNumber",
+          "type": "uint256"
         }
       ],
       "name": "getRoundWinners",
@@ -345,6 +559,72 @@
           "internalType": "address[]",
           "name": "",
           "type": "address[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_tournamentId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getTournamentBracket",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "totalRounds",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "currentRound",
+          "type": "uint256"
+        },
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "matchAddress",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "player1",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "player2",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "winner",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "roundNumber",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "matchIndex",
+              "type": "uint256"
+            },
+            {
+              "internalType": "enum MatchContract.MatchStatus",
+              "name": "status",
+              "type": "uint8"
+            }
+          ],
+          "internalType": "struct TournamentContract.MatchInfo[][]",
+          "name": "matches",
+          "type": "tuple[][]"
         }
       ],
       "stateMutability": "view",
@@ -409,6 +689,11 @@
           "internalType": "uint256",
           "name": "totalPrize",
           "type": "uint256"
+        },
+        {
+          "internalType": "address[]",
+          "name": "participants",
+          "type": "address[]"
         }
       ],
       "stateMutability": "view",

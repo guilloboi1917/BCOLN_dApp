@@ -16,9 +16,9 @@ export function ParticipantsList({ participants }) {
             participants.map((participant, index) => (
               <TableRow key={index}>
                 <TableCell className="font-mono text-xs">{participant.address}</TableCell>
-                <TableCell className="text-right text-sm text-muted-foreground">
+                {/* <TableCell className="text-right text-sm text-muted-foreground">
                   {formatDistanceToNow(new Date(participant.joinedAt), { addSuffix: true })}
-                </TableCell>
+                </TableCell> */}
               </TableRow>
             ))
           ) : (

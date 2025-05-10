@@ -26,6 +26,9 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
+import { ethers } from "ethers";
+
+import TournamentContractData from "../../../../lib/contracts/TournamentContract.json";
 
 export default function TournamentDetailsPage() {
   const { id } = useParams();
@@ -35,75 +38,59 @@ export default function TournamentDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Mock API call to fetch tournament details
     const fetchTournament = async () => {
       setIsLoading(true);
       try {
-        // In a real app, this would be an API call to your backend or directly to the blockchain
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const contract = new ethers.Contract(
+          TournamentContractData.address,
+          TournamentContractData.abi,
+          await provider.getSigner()
+        );
 
-        // Mock data
-        setTournament({
-          id,
-          title: "Crypto Masters 2025",
-          description:
-            "The biggest blockchain gaming tournament of the year. Compete against the best players from around the world in this prestigious event.",
-          entryFee: "0.05 ETH",
-          prize: "10 ETH",
-          maxParticipants: 8,
-          currentParticipants: 8,
-          startDate: "May 15, 2025",
-          registrationDeadline: "May 10, 2025",
-          status: "active",
-          organizer: "0x1234...5678",
-          participants: Array(8)
-            .fill(0)
-            .map((_, i) => ({
-              address: `0x${Math.random()
-                .toString(16)
-                .substring(2, 10)}...${Math.random()
-                .toString(16)
-                .substring(2, 6)}`,
-              joinedAt: new Date(
-                Date.now() - Math.random() * 10000000000
-              ).toISOString(),
-            })),
-          matches: [
-            {
-              id: "m1",
-              round: 1,
-              player1: "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
-              player2: "0x5678...9012",
-              winner: null,
-              status: "scheduled",
-              scheduledTime: "May 15, 2025, 12:00 PM",
-              resolutionDeadline: "May 17, 2025, 12:00 PM",
-              juryDecision: null,
-            },
-            {
-              id: "m2",
-              round: 1,
-              player1: "0x2345...6789",
-              player2: "0x6789...0123",
-              winner: "0x2345...6789",
-              status: "disputed",
-              scheduledTime: "May 15, 2025, 1:00 PM",
-              resolutionDeadline: "May 17, 2025, 12:00 PM",
-              juryDecision: "0x2345...6789", // winner's address if resolved by jury
-            },
-            {
-              id: "m3",
-              round: 1,
-              player1: "0x1234...5678",
-              player2: "0x5678...9012",
-              winner: null,
-              status: "completed",
-              scheduledTime: "May 15, 2025, 12:00 PM",
-              resolutionDeadline: "May 17, 2025, 12:00 PM",
-              juryDecision: null,
-            },
-          ],
-        });
+        console.log("ID", id);
+
+        const tournamentData = await contract.getTournamentDetails(id);
+        const [totalRounds, currentRound, matches] = await contract.getTournamentBracket(id);
+
+        const parsedTournament = {
+          title: tournamentData.name,
+          description: tournamentData.description,
+          entryFee: ethers.formatEther(tournamentData.entryFee),
+          prize: ethers.formatEther(tournamentData.totalPrize),
+          maxParticipants: tournamentData.maxParticipants,
+          registeredParticipants: tournamentData.registeredParticipants,
+          participantList: tournamentData.participants,
+          startDate: new Date(
+            Number(tournamentData.startTime) * 1000
+          ).toLocaleDateString(),
+          status: mapStatus(tournamentData.status),
+          currentRound: tournamentData.currentRound,
+          totalRounds: tournamentData.totalRounds,
+          totalPrize: ethers.formatEther(tournamentData.totalPrize),
+          matches
+        };
+
+        console.log("LIST", parsedTournament.participantList);
+
+        // const parsedTournament = {
+        //   id: tournamentData.id.toString(),
+        //   title: tournamentData.name,
+        //   description: tournamentData.description,
+        //   entryFee: ethers.formatEther(tournamentData.entryFee),
+        //   prize: ethers.formatEther(tournamentData.totalPrize),
+        //   participants: tournamentData.maxParticipants,
+        //   currentParticipants: tournamentData.currentParticipants.toString(),
+        //   startDate: new Date(Number(tournamentData.startTime) * 1000).toLocaleDateString(),
+        //   status: mapStatus(tournamentData.status),
+        //   participants: tournamentData.participants.map((p) => ({
+        //     address: p.address,
+        //     joinedAt: new Date(Number(p.joinedAt) * 1000).toLocaleDateString(),
+        //   })),
+        //   matches: tournamentData.matches || [],
+        // };
+
+        setTournament(parsedTournament);
       } catch (error) {
         console.error("Error fetching tournament:", error);
         toast.error("Error loading tournament", {
@@ -117,6 +104,10 @@ export default function TournamentDetailsPage() {
     fetchTournament();
   }, [id]);
 
+  const mapStatus = (statusId) => {
+    return ["open", "active", "completed", "cancelled"][statusId] || "unknown";
+  };
+
   const handleJoinTournament = async () => {
     if (!connected) {
       toast.info("Wallet not connected", {
@@ -127,8 +118,16 @@ export default function TournamentDetailsPage() {
 
     setIsJoining(true);
     try {
-      // This would call the actual contract method in a real implementation
-      await joinTournament(id, tournament.entryFee);
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const contract = new ethers.Contract(
+        TournamentContractData.address,
+        TournamentContractData.abi,
+        await provider.getSigner()
+      );
+
+      await contract.registerForTournament(id, {
+        value: ethers.parseEther(tournament.entryFee)
+      });
 
       toast.success("Successfully joined!", {
         description: "You have successfully joined the tournament",
@@ -137,14 +136,6 @@ export default function TournamentDetailsPage() {
       // Update the tournament state to reflect the new participant
       setTournament((prev) => ({
         ...prev,
-        currentParticipants: prev.currentParticipants + 1,
-        participants: [
-          ...prev.participants,
-          {
-            address: address,
-            joinedAt: new Date().toISOString(),
-          },
-        ],
       }));
     } catch (error) {
       console.error("Error joining tournament:", error);
@@ -187,12 +178,16 @@ export default function TournamentDetailsPage() {
     );
   }
 
-  const isParticipant = tournament.participants.some(
-    (p) => p.address === address
-  );
-  const isFull = tournament.currentParticipants >= tournament.maxParticipants;
-  const canJoin =
-    !isParticipant && !isFull && tournament.status === "open" && connected;
+  // const isParticipant = tournament.registeredParticipants.some(
+  //   (p) => p.address.toLowerCase() === address.toLowerCase()  // Case-insensitive check
+  // );
+  // const isFull = tournament.registeredParticipants.length >= tournament.maxParticipants;
+  // const canJoin =
+  //   !isParticipant && !isFull && tournament.status === "open" && connected;
+
+  const isParticipant = false;
+  const isFull = false;
+  const canJoin = true;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -221,7 +216,7 @@ export default function TournamentDetailsPage() {
             </Badge>
             <Badge variant="outline" className="flex items-center gap-1">
               <Users className="h-3 w-3" />
-              {tournament.currentParticipants}/{tournament.maxParticipants}
+              {tournament.registeredParticipants}/{tournament.maxParticipants}
             </Badge>
           </div>
         </div>
@@ -284,7 +279,7 @@ export default function TournamentDetailsPage() {
                 <div>
                   <p className="text-sm font-medium">Participants</p>
                   <p className="text-sm text-muted-foreground">
-                    {tournament.currentParticipants} /{" "}
+                    {tournament.registeredParticipants} /{" "}
                     {tournament.maxParticipants}
                   </p>
                 </div>
@@ -356,7 +351,15 @@ export default function TournamentDetailsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <TournamentBracket tournament={tournament} />
+              {/* <TournamentBracket tournament={tournament} /> */}
+              <TournamentBracket
+                tournament={{
+                  maxParticipants: tournament.maxParticipants,
+                  totalRounds: tournament.totalRounds,
+                  currentRound: tournament.currentRound,
+                  matches: tournament.matches,
+                }}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -366,12 +369,12 @@ export default function TournamentDetailsPage() {
             <CardHeader>
               <CardTitle>Participants</CardTitle>
               <CardDescription>
-                {tournament.currentParticipants} out of{" "}
+                {tournament.registeredParticipants} out of{" "}
                 {tournament.maxParticipants} spots filled
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ParticipantsList participants={tournament.participants} />
+              <ParticipantsList participants={tournament.participantList} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -384,7 +387,7 @@ export default function TournamentDetailsPage() {
                 View scheduled, disputed, and completed matches
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            {/* <CardContent>
               {tournament.matches.length > 0 ? (
                 <div className="space-y-4">
                   {tournament.matches.map((match) => {
@@ -525,7 +528,7 @@ export default function TournamentDetailsPage() {
                   </p>
                 </div>
               )}
-            </CardContent>
+            </CardContent> */}
           </Card>
         </TabsContent>
       </Tabs>

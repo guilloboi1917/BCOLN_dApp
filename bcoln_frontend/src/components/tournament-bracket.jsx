@@ -7,46 +7,33 @@ export function TournamentBracket({ tournament }) {
   const [rounds, setRounds] = useState([])
 
   useEffect(() => {
-    const maxParticipants = tournament.maxParticipants;
-    const numRounds = Math.log2(maxParticipants);
-    const groupedRounds = [];
-  
-    for (let round = 1; round <= numRounds; round++) {
-      const expectedMatches = maxParticipants / Math.pow(2, round);
-      const realMatches = tournament.matches.filter((m) => m.round === round);
-      const filledMatches = [];
-  
-      for (let i = 0; i < expectedMatches; i++) {
-        const match = realMatches[i];
-  
-        if (match) {
-          filledMatches.push(match);
-        } else {
-          filledMatches.push({
-            id: `placeholder-${round}-${i}`,
-            round,
-            player1: null,
-            player2: null,
-            winner: null,
-            status: "pending",
-          });
-        }
-      }
-  
-      groupedRounds.push({
-        round,
+    const matchesNested = tournament.matches;
+    console.log("matches", matchesNested)
+    if (!matchesNested) return;
+
+    const groupedRounds = matchesNested.map((matches, index) => {
+      const roundMatches = matches.length > 0 ? matches : Array(Math.pow(2, Number(tournament.totalRounds) - index - 1)).fill(null);
+
+      return {
+        round: index + 1,
         name:
-          round === numRounds
+          index === matchesNested.length - 1
             ? "Final"
-            : round === numRounds - 1
+            : index === matchesNested.length - 2
             ? "Semi-Finals"
-            : round === numRounds - 2
+            : index === matchesNested.length - 3
             ? "Quarter-Finals"
-            : `Round ${round}`,
-        matches: filledMatches,
-      });
-    }
-  
+            : `Round ${index + 1}`,
+        matches: roundMatches.map((match, i) => ({
+          id: match ? `${match.matchAddress}-${i}` : `placeholder-${i}`,
+          player1: match ? match.player1 : "TBD",   // Use "TBD" if no match
+          player2: match ? match.player2 : "TBD",   // Use "TBD" if no match
+          winner: match ? match.winner : "TBD",     // Use "TBD" if no winner
+          status: match ? match.status : "Pending", // Use "Pending" if match is not set
+        })),
+      };
+    });
+
     setRounds(groupedRounds);
   }, [tournament]);
 
@@ -65,26 +52,18 @@ export function TournamentBracket({ tournament }) {
           <div key={round.round} className="flex-1">
             <h3 className="text-sm font-medium mb-3 text-center">{round.name}</h3>
             <div className="space-y-4">
-              {round.matches.map((match, index) => (
+              {round.matches.map((match) => (
                 <Card key={match.id} className="p-3 text-xs">
                   <div className="space-y-2">
                     <div
-                      className={`p-2 rounded ${match.winner && match.winner === match.player1 ? "bg-green-100 dark:bg-green-900" : "bg-muted"}`}
+                      className={`p-2 rounded ${match.winner !== "TBD" && match.winner === match.player1 ? "bg-green-100 dark:bg-green-900" : "bg-muted"}`}
                     >
-                      {match.player1 ? (
-                        <div className="truncate">{match.player1}</div>
-                      ) : (
-                        <div className="text-muted-foreground italic">TBD</div>
-                      )}
+                      <div className="truncate">{match.player1}</div>
                     </div>
                     <div
-                      className={`p-2 rounded ${match.winner && match.winner === match.player2 ? "bg-green-100 dark:bg-green-900" : "bg-muted"}`}
+                      className={`p-2 rounded ${match.winner !== "TBD" && match.winner === match.player2 ? "bg-green-100 dark:bg-green-900" : "bg-muted"}`}
                     >
-                      {match.player2 ? (
-                        <div className="truncate">{match.player2}</div>
-                      ) : (
-                        <div className="text-muted-foreground italic">TBD</div>
-                      )}
+                      <div className="truncate">{match.player2}</div>
                     </div>
                   </div>
                 </Card>
@@ -96,4 +75,3 @@ export function TournamentBracket({ tournament }) {
     </div>
   )
 }
-

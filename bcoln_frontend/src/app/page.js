@@ -1,44 +1,59 @@
+"use client"
+
 import Link from "next/link";
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TournamentCard } from "@/components/tournament-card";
 import { WalletConnect } from "@/components/wallet-connect";
 import { Trophy, Users, Calendar, TrendingUp } from "lucide-react";
+import { ethers } from "ethers"
+
+import TournamentContractData from '../../lib/contracts/TournamentContract.json'; 
 
 export default function Home() {
-  // Mock data for featured tournaments
-  const featuredTournaments = [
-    {
-      id: "1",
-      title: "Crypto Masters 2025",
-      description: "The biggest blockchain gaming tournament of the year",
-      entryFee: "0.05 ETH",
-      prize: "10 ETH",
-      participants: 8,
-      startDate: "May 15, 2025",
-      status: "active",
-    },
-    {
-      id: "2",
-      title: "Web3 Poker Championship",
-      description: "Test your poker skills against the best players",
-      entryFee: "0.1 ETH",
-      prize: "20 ETH",
-      participants: 8,
-      startDate: "June 1, 2025",
-      status: "open",
-    },
-    {
-      id: "3",
-      title: "NFT Creators Showdown",
-      description: "A creative competition for NFT artists",
-      entryFee: "0.02 ETH",
-      prize: "5 ETH",
-      participants: 8,
-      startDate: "April 20, 2025",
-      status: "open",
-    },
-  ];
+  const [featuredTournaments, setFeaturedTournaments] = useState([])
+
+  useEffect(() => {
+    const fetchFeaturedTournaments = async () => {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum)
+        const contract = new ethers.Contract(
+          TournamentContractData.address,
+          TournamentContractData.abi,
+          await provider.getSigner()
+        )
+
+        const data = await contract.getAllTournaments()
+
+        const parsed = data.map((t) => ({
+          id: t.id.toString(),
+          title: t.name,
+          description: t.description,
+          entryFee: ethers.formatEther(t.entryFee),
+          prize: ethers.formatEther(t.totalPrize),
+          participants: Number(t.maxParticipants),
+          startDate: new Date(Number(t.startTime) * 1000).toLocaleDateString(),
+          status: mapStatus(t.status),
+        }))
+
+        // Sort by participants descending and take top 5
+        const featured = parsed
+          .sort((a, b) => b.participants - a.participants)
+          .slice(0, 3)
+
+        setFeaturedTournaments(featured)
+      } catch (err) {
+        console.error("Failed to fetch tournaments", err)
+      }
+    }
+
+    fetchFeaturedTournaments()
+  }, [])
+
+  const mapStatus = (statusId) => {
+    return ["open", "active", "completed", "cancelled"][statusId] || "unknown"
+  }
 
   return (
     <main className="container mx-auto px-4 py-8">
