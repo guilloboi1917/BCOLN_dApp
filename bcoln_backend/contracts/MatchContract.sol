@@ -38,6 +38,7 @@ contract MatchContract {
     struct Match {
         address player1;
         address player2;
+        address winner;
         bytes32 player1Commit;
         bytes32 player2Commit;
         bool player1Joined;
@@ -118,6 +119,7 @@ contract MatchContract {
         creator = _creator;
         currentMatch.player1 = _player1;
         currentMatch.player2 = _player2;
+        currentMatch.winner = address(0); // Initialize winner as zero address
         currentMatch.entryFee = _entryFee;
         currentMatch.revealDeadline = block.timestamp + REVEAL_PERIOD;
         status = MatchStatus.Pending;
@@ -142,6 +144,36 @@ contract MatchContract {
 
     function getEntryFee() external view returns (uint256) {
         return currentMatch.entryFee;
+    }
+
+    function getPlayers() external view returns (address player1, address player2) {
+        return (currentMatch.player1, currentMatch.player2);
+    }
+
+    function getWinner() external view returns (address) {
+        return currentMatch.winner;
+    }
+
+    function getMatchDetails() external view returns (
+        address player1,
+        address player2,
+        address winner,
+        MatchStatus matchStatus,
+        uint256 matchRound,
+        uint256 matchIdx
+    ) {
+        return (
+            currentMatch.player1,
+            currentMatch.player2,
+            currentMatch.winner,
+            status,
+            roundNumber,
+            matchIndex
+        );
+    }
+
+    function havePlayersJoined() external view returns (bool player1Joined, bool player2Joined) {
+        return (currentMatch.player1Joined, currentMatch.player2Joined);
     }
 
     function joinMatch() external payable onlyPlayers {
@@ -290,6 +322,8 @@ contract MatchContract {
     function _resolveMatch(address winner) private {
         status = MatchStatus.Completed;
 
+        currentMatch.winner = winner;
+
         // Update reputations
         address loser = winner == currentMatch.player1
             ? currentMatch.player2
@@ -341,6 +375,8 @@ contract MatchContract {
 
     function _resolveDispute(address winner) private {
         status = MatchStatus.Completed;
+
+        currentMatch.winner = winner;
 
         // Penalize liar
         address liar = winner == currentMatch.player1
