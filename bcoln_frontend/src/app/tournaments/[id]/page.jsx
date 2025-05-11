@@ -30,12 +30,24 @@ import { ethers } from "ethers";
 
 import TournamentContractData from "../../../../lib/contracts/TournamentContract.json";
 
+const MATCH_STATUS = {
+  SCHEDULED: "scheduled",
+  PENDING: "pending",
+  COMPLETED: "completed",
+  DISPUTED: "disputed",
+  RESOLVED: "resolved",
+};
+
 export default function TournamentDetailsPage() {
   const { id } = useParams();
   const { connected, address, joinTournament } = useWeb3();
   const [isJoining, setIsJoining] = useState(false);
   const [tournament, setTournament] = useState(null);
+  const [tournamentMatches, setTournamentMatches] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState(null);
+
 
   const fetchTournament = async () => {
     setIsLoading(true);
@@ -64,7 +76,16 @@ export default function TournamentDetailsPage() {
       
       const participants = await contract.getTournamentParticipants(id);
       const [bracketTotalRounds, bracketCurrentRound, matches] = await contract.getTournamentBracket(id);
-      
+      const allMatches = await contract.getAllTournamentMatches(id);
+      const groupedMatches = Array.from({ length: Number(totalRounds) }, () => []);
+
+      Array.from(allMatches).forEach((match) => {
+        if (Number(match.roundNumber) > 0 && Number(match.roundNumber) <= totalRounds) {
+          groupedMatches[Number(match.roundNumber) - 1].push(match);
+        }        
+      });
+
+      setTournamentMatches(groupedMatches);
 
       const parsedTournament = {
         title: name,
@@ -168,6 +189,36 @@ export default function TournamentDetailsPage() {
     }
   };
 
+  const handleStartTournament = async () => {
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const contract = new ethers.Contract(
+        TournamentContractData.address,
+        TournamentContractData.abi,
+        await provider.getSigner()
+      );
+  
+      const tx = await contract.startTournament(id);
+      toast.success("Tournament starting...", {
+        description: "Waiting for confirmation...",
+      });
+  
+      await tx.wait();
+      toast.success("Tournament started!");
+      await fetchTournament();
+    } catch (error) {
+      console.error("Error starting tournament:", error);
+      toast.error("Failed to start tournament", {
+        description: error.reason || "An unexpected error occurred",
+      });
+    }
+  };
+
+  const handleReportMatch = (match) => {
+    setSelectedMatch(match);
+    setReportDialogOpen(true);
+  };
+  
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[60vh]">
@@ -210,6 +261,12 @@ export default function TournamentDetailsPage() {
     isParticipant ||
     tournament.status !== "open";  
 
+  const canStartTournament =
+    isParticipant &&
+    isFull &&
+    tournament.status === "open";
+
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col md:flex-row justify-between items-start gap-6 mb-8">
@@ -232,22 +289,28 @@ export default function TournamentDetailsPage() {
             </Badge>
           </div>
         </div>
+        <div className="flex flex-wrap justify-end gap-3">
+          <Button
+            onClick={handleStartTournament}
+            disabled={!canStartTournament}
+          >
+            Start Tournament
+          </Button>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-        <Button
-          onClick={handleJoinTournament}
-          disabled={isJoinDisabled}
-        >
-          {isJoining
-            ? "Joining..."
-            : `Join Tournament (${tournament.entryFee})`}
-        </Button>
+          <Button
+            onClick={handleJoinTournament}
+            disabled={isJoinDisabled}
+          >
+            {isJoining
+              ? "Joining..."
+              : `Join Tournament (${tournament.entryFee})`}
+          </Button>
+
           <Button variant="outline" asChild>
             <Link href="/tournaments">Back to Tournaments</Link>
           </Button>
         </div>
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -365,7 +428,7 @@ export default function TournamentDetailsPage() {
                   maxParticipants: tournament.maxParticipants,
                   totalRounds: tournament.totalRounds,
                   currentRound: tournament.currentRound,
-                  matches: tournament.matches,
+                  matches: tournamentMatches, // ✅ grouped by round
                 }}
               />
             </CardContent>
@@ -395,151 +458,78 @@ export default function TournamentDetailsPage() {
                 View scheduled, disputed, and completed matches
               </CardDescription>
             </CardHeader>
-            {/* <CardContent>
-              {tournament.matches.length > 0 ? (
-                <div className="space-y-4">
-                  {tournament.matches.map((match) => {
-                    const isUserParticipant =
-                      isParticipant &&
-                      (match.player1 === address || match.player2 === address);
+            <CardContent>
+            {tournamentMatches.flat().length > 0 ? (
+              <div className="space-y-4">
+                {tournamentMatches.flat().map((match, index) => {
+                  const isUserParticipant =
+                    address?.toLowerCase() === match.player1.toLowerCase() ||
+                    address?.toLowerCase() === match.player2.toLowerCase();
 
-                    const userIsJury = true; // Replace this with actual jury check
+                  return (
+                    <div key={index} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium">Round {match.roundNumber}</span>
+                        <Badge variant="outline">{match.status}</Badge>
+                      </div>
 
-                    return (
-                      <div key={match.id} className="border rounded-lg p-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm font-medium">
-                            Round {match.round}
-                          </span>
-                          {match.status === "completed" && (
-                            <Badge
-                              variant="outline"
-                              className="bg-green-100 text-green-800"
-                            >
-                              Completed
-                            </Badge>
-                          )}
-                          {match.status === "pending" && (
-                            <Badge
-                              variant="outline"
-                              className="bg-yellow-100 text-yellow-800"
-                            >
-                              Pending Confirmation
-                            </Badge>
-                          )}
-                          {match.status === "disputed" && (
-                            <Badge
-                              variant="outline"
-                              className="bg-red-100 text-red-800"
-                            >
-                              Disputed
-                            </Badge>
-                          )}
-                          {match.status === "resolved" && (
-                            <Badge
-                              variant="outline"
-                              className="bg-purple-100 text-purple-800"
-                            >
-                              Resolved by Jury
-                            </Badge>
-                          )}
-                          {match.status === "scheduled" && (
-                            <Badge
-                              variant="outline"
-                              className="bg-blue-100 text-blue-800"
-                            >
-                              Scheduled
-                            </Badge>
-                          )}
+                      <div className="flex justify-between items-center py-2">
+                        <div className="text-sm truncate max-w-[40%] font-mono">{match.player1}</div>
+                        <div className="text-xs text-muted-foreground">vs</div>
+                        <div className="text-sm truncate max-w-[40%] text-right font-mono">{match.player2}</div>
+                      </div>
+
+                      {match.winner !== "0x0000000000000000000000000000000000000000" && (
+                        <div className="mt-2 text-sm text-muted-foreground">
+                          Winner: <span className="font-medium">{match.winner}</span>
                         </div>
+                      )}
 
-                        <div className="flex justify-between items-center py-2">
-                          <div className="text-sm truncate max-w-[40%]">
-                            {match.player1}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            vs
-                          </div>
-                          <div className="text-sm truncate max-w-[40%] text-right">
-                            {match.player2}
-                          </div>
-                        </div>
-
-                        {match.winner && (
-                          <div className="mt-2 text-sm text-muted-foreground">
-                            Winner:{" "}
-                            <span className="font-medium">{match.winner}</span>
-                            {match.status === "resolved" && (
-                              <span className="ml-2 text-xs text-purple-600">
-                                (Jury Decision)
-                              </span>
-                            )}
-                          </div>
+                      <div className="mt-3 flex justify-between items-center">
+                        {isUserParticipant && match.status === MATCH_STATUS.SCHEDULED && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleReportMatch(match)}
+                          >
+                            Report Result
+                          </Button>
                         )}
 
-                        {match.status === "pending" &&
-                          match.resolutionDeadline && (
-                            <div className="mt-1 text-xs text-yellow-600">
-                              Awaiting confirmation until{" "}
-                              {new Date(
-                                match.resolutionDeadline
-                              ).toLocaleString()}
-                            </div>
-                          )}
-
-                        <div className="mt-3 flex justify-between items-center">
-                          <div className="text-xs text-muted-foreground">
-                            {match.scheduledTime}
-                          </div>
-
-                          {isUserParticipant &&
-                            match.status === "scheduled" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleReportMatch(match)}
-                              >
-                                Report Result
-                              </Button>
-                            )}
-
-                          {isUserParticipant && match.status === "pending" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleReportMatch(match)}
-                            >
-                              Confirm Result
-                            </Button>
-                          )}
-
-                          {match.status === "disputed" && userIsJury && (
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => {
-                                // Jury decision handler logic here
-                              }}
-                            >
-                              Resolve Match
-                            </Button>
-                          )}
-                        </div>
+                        {isUserParticipant && match.status === MATCH_STATUS.PENDING && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleReportMatch(match)}
+                          >
+                            Confirm Result
+                          </Button>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">
-                    No matches scheduled yet
-                  </p>
-                </div>
-              )}
-            </CardContent> */}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No matches scheduled yet</p>
+              </div>
+            )}
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+      <MatchReportDialog
+        open={reportDialogOpen}
+        onOpenChange={setReportDialogOpen}
+        match={selectedMatch}
+        onSubmit={({ winner }) => {
+          toast.success("Match result submitted", {
+            description: `You selected winner: ${winner}`,
+          });
+          setReportDialogOpen(false);
+        }}
+      />
     </div>
   );
 }
