@@ -74,7 +74,8 @@ contract MatchContract {
 
     // Events
     event MatchCreated(address player1, address player2);
-    event ResultRevealed(address player);
+     event ResultCommitted(address player);
+    event ResultRevealed(address player, string result);
     event DisputeInitiated();
     event JuryVoted(address indexed juror, uint256 vote);
     event MatchResolved(address indexed winner);
@@ -125,6 +126,9 @@ contract MatchContract {
         status = MatchStatus.Pending;
         currentMatch.player1Joined = false;
         currentMatch.player2Joined = false;
+
+        currentMatch.juryPool = new address[](0);
+
         if (_tournamentContract != address(0)) {
             tournamentContract = _tournamentContract;
             tournamentId = _tournamentId;
@@ -154,13 +158,18 @@ contract MatchContract {
         return currentMatch.winner;
     }
 
+    function getJuryCount() external view returns (uint256) {
+        return currentMatch.juryPool.length;
+    }
+
     function getMatchDetails() external view returns (
         address player1,
         address player2,
         address winner,
         MatchStatus matchStatus,
         uint256 matchRound,
-        uint256 matchIdx
+        uint256 matchIdx,
+        uint256 juryCount
     ) {
         return (
             currentMatch.player1,
@@ -168,7 +177,8 @@ contract MatchContract {
             currentMatch.winner,
             status,
             roundNumber,
-            matchIndex
+            matchIndex,
+            currentMatch.juryPool.length
         );
     }
 
@@ -252,7 +262,7 @@ contract MatchContract {
             console.log("Player 2 revealed");
         }
 
-        emit ResultRevealed(msg.sender);
+        emit ResultRevealed(msg.sender, result ? "player1_won" : "player2_won");
         console.log("Both revealed");
 
         // Check if both revealed
@@ -269,6 +279,65 @@ contract MatchContract {
                 else 
                     _resolveMatch(currentMatch.player1);
             } else {
+                status = MatchStatus.Dispute;
+                emit DisputeInitiated();
+            }
+        }
+    }
+
+    // Combined commit and reveal function
+    // Player commits their result directly with salt and result string
+    function commitAndRevealResult(
+        bytes32 salt,
+        bool didIWin
+    ) external payable onlyPlayers {
+        require(status == MatchStatus.Commit, "Not in commit phase");
+        
+        // Ensure player has staked the required amount
+        require(
+            msg.value == reputationRegistry.getStakeAmount(msg.sender),
+            "Incorrect stake amount"
+        );
+        
+        // Set commitment hash (retaining this for verification)
+        bytes32 commitment = keccak256(
+            abi.encodePacked("I_report_truth", salt)
+        );
+        
+        string memory resultString;
+        
+        if (msg.sender == currentMatch.player1) {
+            currentMatch.player1Commit = commitment;
+            currentMatch.player1Salt = salt;
+            resultString = didIWin ? "player1_won" : "player2_won";
+            currentMatch.player1Result = resultString;
+        } else {
+            currentMatch.player2Commit = commitment;
+            currentMatch.player2Salt = salt;
+            resultString = didIWin ? "player2_won" : "player1_won";
+            currentMatch.player2Result = resultString;
+        }
+        
+        emit ResultCommitted(msg.sender);
+        emit ResultRevealed(msg.sender, resultString);
+        
+        // Check if both players have committed their results
+        if (
+            currentMatch.player1Salt != bytes32(0) &&
+            currentMatch.player2Salt != bytes32(0)
+        ) {
+            // Both players have committed results, check if they agree
+            if (
+                keccak256(abi.encodePacked(currentMatch.player1Result)) ==
+                keccak256(abi.encodePacked(currentMatch.player2Result))
+            ) {
+                // Players agree on the result
+                if (keccak256(abi.encodePacked(currentMatch.player2Result)) == keccak256(abi.encodePacked("player2_won")))
+                    _resolveMatch(currentMatch.player2);
+                else
+                    _resolveMatch(currentMatch.player1);
+            } else {
+                // Players disagree, initiate dispute
                 status = MatchStatus.Dispute;
                 emit DisputeInitiated();
             }
@@ -316,6 +385,57 @@ contract MatchContract {
                 : currentMatch.player2;
             _resolveDispute(winner);
         }
+    }
+
+    // Combined join jury and vote function
+    // Jurors stake and vote in a single transaction
+    function joinJuryAndVote(uint256 vote) external payable {
+        require(status == MatchStatus.Dispute, "No active dispute");
+        require(!reputationRegistry.isBanned(msg.sender), "You are banned");
+        require(msg.value == JURY_STAKE, "Incorrect jury stake");
+        require(vote == 1 || vote == 2, "Invalid vote: must be 1 (player1) or 2 (player2)");
+        
+        // Check if juror has already joined
+        for (uint i = 0; i < currentMatch.juryPool.length; i++) {
+            require(currentMatch.juryPool[i] != msg.sender, "Already a juror");
+        }
+        
+        // Add juror to pool and record vote
+        currentMatch.juryPool.push(msg.sender);
+        currentMatch.juryVotes[msg.sender] = vote;
+        
+        emit JuryVoted(msg.sender, vote);
+        
+        // Automatically tally votes if we have at least 3 jurors
+        if (currentMatch.juryPool.length >= 3) {
+            _tallyJuryVotes();
+        }
+    }
+
+    // Internal function to tally jury votes and resolve dispute
+    function _tallyJuryVotes() private {
+        uint256 player1Votes;
+        uint256 player2Votes;
+
+        for (uint i = 0; i < currentMatch.juryPool.length; i++) {
+            if (currentMatch.juryVotes[currentMatch.juryPool[i]] == 1)
+                player1Votes++;
+            else if (currentMatch.juryVotes[currentMatch.juryPool[i]] == 2)
+                player2Votes++;
+        }
+
+        // Determine winner based on votes
+        address winner;
+        if (player1Votes > player2Votes) {
+            winner = currentMatch.player1;
+        } else if (player2Votes > player1Votes) {
+            winner = currentMatch.player2;
+        } else {
+            // In case of a tie, default to player1 (or implement another tiebreaker)
+            winner = currentMatch.player1;
+        }
+        
+        _resolveDispute(winner);
     }
 
     // Internal resolution functions
