@@ -37,83 +37,84 @@ export default function TournamentDetailsPage() {
   const [tournament, setTournament] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const fetchTournament = async () => {
+    setIsLoading(true);
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const contract = new ethers.Contract(
+        TournamentContractData.address,
+        TournamentContractData.abi,
+        await provider.getSigner()
+      );
+
+      console.log("ID", id);
+
+      const [
+        name,
+        description,
+        entryFee,
+        maxParticipants,
+        registeredParticipants,
+        startTime,
+        status,
+        currentRound,
+        totalRounds,
+        totalPrize
+      ] = await contract.getTournamentDetails(id);
+      
+      const participants = await contract.getTournamentParticipants(id);
+      const [bracketTotalRounds, bracketCurrentRound, matches] = await contract.getTournamentBracket(id);
+      
+
+      const parsedTournament = {
+        title: name,
+        description,
+        entryFee: ethers.formatEther(entryFee),
+        prize: ethers.formatEther(totalPrize),
+        maxParticipants: Number(maxParticipants),
+        registeredParticipants: Number(registeredParticipants),   
+        participantList: participants,
+        startDate: new Date(Number(startTime) * 1000).toLocaleDateString(),
+        status: mapStatus(status),
+        currentRound,
+        totalRounds,
+        totalPrize: ethers.formatEther(totalPrize),
+        matches
+      };
+
+      console.log("LIST", parsedTournament.participantList);
+
+      // const parsedTournament = {
+      //   id: tournamentData.id.toString(),
+      //   title: tournamentData.name,
+      //   description: tournamentData.description,
+      //   entryFee: ethers.formatEther(tournamentData.entryFee),
+      //   prize: ethers.formatEther(tournamentData.totalPrize),
+      //   participants: tournamentData.maxParticipants,
+      //   currentParticipants: tournamentData.currentParticipants.toString(),
+      //   startDate: new Date(Number(tournamentData.startTime) * 1000).toLocaleDateString(),
+      //   status: mapStatus(tournamentData.status),
+      //   participants: tournamentData.participants.map((p) => ({
+      //     address: p.address,
+      //     joinedAt: new Date(Number(p.joinedAt) * 1000).toLocaleDateString(),
+      //   })),
+      //   matches: tournamentData.matches || [],
+      // };
+
+      setTournament(parsedTournament);
+      setTournament((prev) => ({ ...parsedTournament }));
+
+    } catch (error) {
+      console.error("Error fetching tournament:", error);
+      toast.error("Error loading tournament", {
+        description: "Could not load tournament details. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchTournament = async () => {
-      setIsLoading(true);
-      try {
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const contract = new ethers.Contract(
-          TournamentContractData.address,
-          TournamentContractData.abi,
-          await provider.getSigner()
-        );
-
-        console.log("ID", id);
-
-        const [
-          name,
-          description,
-          entryFee,
-          maxParticipants,
-          registeredParticipants,
-          startTime,
-          status,
-          currentRound,
-          totalRounds,
-          totalPrize
-        ] = await contract.getTournamentDetails(id);
-        
-        const participants = await contract.getTournamentParticipants(id);
-        const [bracketTotalRounds, bracketCurrentRound, matches] = await contract.getTournamentBracket(id);
-        
-
-        const parsedTournament = {
-          title: name,
-          description,
-          entryFee: ethers.formatEther(entryFee),
-          prize: ethers.formatEther(totalPrize),
-          maxParticipants,
-          registeredParticipants,
-          participantList: participants, // 👈 no formatting here!
-          startDate: new Date(Number(startTime) * 1000).toLocaleDateString(),
-          status: mapStatus(status),
-          currentRound,
-          totalRounds,
-          totalPrize: ethers.formatEther(totalPrize),
-          matches
-        };
-        
-
-        console.log("LIST", parsedTournament.participantList);
-
-        // const parsedTournament = {
-        //   id: tournamentData.id.toString(),
-        //   title: tournamentData.name,
-        //   description: tournamentData.description,
-        //   entryFee: ethers.formatEther(tournamentData.entryFee),
-        //   prize: ethers.formatEther(tournamentData.totalPrize),
-        //   participants: tournamentData.maxParticipants,
-        //   currentParticipants: tournamentData.currentParticipants.toString(),
-        //   startDate: new Date(Number(tournamentData.startTime) * 1000).toLocaleDateString(),
-        //   status: mapStatus(tournamentData.status),
-        //   participants: tournamentData.participants.map((p) => ({
-        //     address: p.address,
-        //     joinedAt: new Date(Number(p.joinedAt) * 1000).toLocaleDateString(),
-        //   })),
-        //   matches: tournamentData.matches || [],
-        // };
-
-        setTournament(parsedTournament);
-      } catch (error) {
-        console.error("Error fetching tournament:", error);
-        toast.error("Error loading tournament", {
-          description: "Could not load tournament details. Please try again.",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchTournament();
   }, [id]);
 
@@ -138,18 +139,22 @@ export default function TournamentDetailsPage() {
         await provider.getSigner()
       );
 
-      await contract.registerForTournament(id, {
-        value: ethers.parseEther(tournament.entryFee)
+      const tx = await contract.registerForTournament(id, {
+        value: ethers.parseEther(tournament.entryFee),
       });
-
+      
+      toast.success("Transaction submitted!", {
+        description: "Waiting for confirmation...",
+      });
+      
+      await tx.wait(); // wait until the tx is mined on-chain
+      
       toast.success("Successfully joined!", {
         description: "You have successfully joined the tournament",
       });
+      
+      await fetchTournament(); // fetch updated data      
 
-      // Update the tournament state to reflect the new participant
-      setTournament((prev) => ({
-        ...prev,
-      }));
     } catch (error) {
       console.error("Error joining tournament:", error);
       toast.error("Error joining tournament", {
