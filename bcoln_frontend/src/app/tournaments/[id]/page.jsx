@@ -26,6 +26,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { ethers } from "ethers";
+import { useRef } from "react";
+
 
 import TournamentContractData from "../../../../lib/contracts/TournamentContract.json";
 import MatchContractData from "../../../../lib/contracts/MatchContract.json";
@@ -56,6 +58,8 @@ export default function TournamentDetailsPage() {
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [joiningMatchAddress, setJoiningMatchAddress] = useState(null);
+  const lastKnownRound = useRef(null);
+
 
 
   const fetchTournament = async () => {
@@ -85,10 +89,22 @@ export default function TournamentDetailsPage() {
       
       const participants = await contract.getTournamentParticipants(id);
       const [bracketTotalRounds, bracketCurrentRound, matches] = await contract.getTournamentBracket(id);
+      console.log("Contract reports:", {
+        bracketTotalRounds: Number(bracketTotalRounds),
+        bracketCurrentRound: Number(bracketCurrentRound),
+        rawMatches: matches
+      });
+      
       const allMatches = await contract.getAllTournamentMatches(id);
       const groupedMatches = Array.from({ length: Number(totalRounds) }, () => []);
 
       for (const match of allMatches) {
+        console.log("Processing match:", {
+          round: Number(match.roundNumber),
+          address: match.matchAddress,
+          status: Number(match.status)
+        });
+        
         if (Number(match.roundNumber) > 0 && Number(match.roundNumber) <= totalRounds) {
           const matchContract = new ethers.Contract(
             match.matchAddress,
@@ -111,7 +127,7 @@ export default function TournamentDetailsPage() {
           });
         }
       }
-      
+      console.log("Grouped matches for UI:", groupedMatches);
 
       setTournamentMatches(groupedMatches);
 
@@ -136,6 +152,7 @@ export default function TournamentDetailsPage() {
       console.log("LIST", parsedTournament.participantList);
 
       setTournament(parsedTournament);
+      lastKnownRound.current = Number(parsedTournament.currentRound);
 
     } catch (error) {
       console.error("Error fetching tournament:", error);
@@ -150,6 +167,33 @@ export default function TournamentDetailsPage() {
   useEffect(() => {
     fetchTournament();
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+  
+    const interval = setInterval(async () => {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const contract = new ethers.Contract(
+          TournamentContractData.address,
+          TournamentContractData.abi,
+          provider
+        );
+  
+        const [, , , , , , , currentRound] = await contract.getTournamentDetails(id);
+  
+        if (lastKnownRound.current !== null && Number(currentRound) > lastKnownRound.current) {
+          console.log("New round detected — refreshing UI");
+          await fetchTournament(); // triggers match fetch + re-render
+        }
+      } catch (error) {
+        console.error("Error polling tournament round:", error);
+      }
+    }, 10000); // every 10 seconds
+  
+    return () => clearInterval(interval);
+  }, [id]);
+  
 
   const mapStatus = (statusId) => {
     return ["open", "active", "completed", "cancelled"][statusId] || "unknown";
