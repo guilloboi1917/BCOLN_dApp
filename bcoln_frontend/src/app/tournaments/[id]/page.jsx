@@ -198,16 +198,17 @@ export default function TournamentDetailsPage() {
     );
   }
 
-  // const isParticipant = tournament.registeredParticipants.some(
-  //   (p) => p.address.toLowerCase() === address.toLowerCase()  // Case-insensitive check
-  // );
-  // const isFull = tournament.registeredParticipants.length >= tournament.maxParticipants;
-  // const canJoin =
-  //   !isParticipant && !isFull && tournament.status === "open" && connected;
-
-  const isParticipant = false;
-  const isFull = false;
-  const canJoin = true;
+  const isParticipant = tournament.participantList.some(
+    (p) => p.address.toLowerCase() === address?.toLowerCase()
+  );
+  
+  const isFull = tournament.registeredParticipants >= tournament.maxParticipants;
+  
+  const isJoinDisabled =
+    isJoining ||
+    isFull ||
+    isParticipant ||
+    tournament.status !== "open";  
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -215,21 +216,12 @@ export default function TournamentDetailsPage() {
         <div>
           <h1 className="text-3xl font-bold">{tournament.title}</h1>
           <div className="flex flex-wrap gap-2 mt-2">
-            <Badge
-              variant={
-                tournament.status === "open"
-                  ? "default"
-                  : tournament.status === "active"
-                  ? "outline"
-                  : "secondary"
-              }
-            >
-              {tournament.status === "open"
+            <Badge variant="default">
+              {tournament.status === "open" && tournament.registeredParticipants < tournament.maxParticipants
                 ? "Open for Entry"
-                : tournament.status === "active"
-                ? "Active"
-                : "Completed"}
+                : "Active"}
             </Badge>
+
             <Badge variant="outline" className="flex items-center gap-1">
               <Trophy className="h-3 w-3" />
               {tournament.prize}
@@ -242,13 +234,14 @@ export default function TournamentDetailsPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          {canJoin && (
-            <Button onClick={handleJoinTournament} disabled={isJoining}>
-              {isJoining
-                ? "Joining..."
-                : `Join Tournament (${tournament.entryFee})`}
-            </Button>
-          )}
+        <Button
+          onClick={handleJoinTournament}
+          disabled={isJoinDisabled}
+        >
+          {isJoining
+            ? "Joining..."
+            : `Join Tournament (${tournament.entryFee})`}
+        </Button>
           <Button variant="outline" asChild>
             <Link href="/tournaments">Back to Tournaments</Link>
           </Button>
@@ -316,27 +309,22 @@ export default function TournamentDetailsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm">Registration</span>
-                <Badge
-                  variant={
-                    tournament.status === "open" ? "default" : "secondary"
-                  }
-                >
-                  {tournament.status === "open" ? "Open" : "Closed"}
+                <Badge variant="default">
+                  {tournament.status === "open" && tournament.registeredParticipants < tournament.maxParticipants
+                    ? "Open"
+                    : "Closed"}
                 </Badge>
               </div>
-
               <div className="flex justify-between items-center">
                 <span className="text-sm">Entry Fee</span>
                 <span className="font-medium">{tournament.entryFee}</span>
               </div>
-
               <div className="flex justify-between items-center">
                 <span className="text-sm">Organizer</span>
                 <span className="font-medium text-xs truncate max-w-[150px]">
-                  {tournament.organizer}
+                  CONFIDENTIAL {/* {tournament.organizer} */}
                 </span>
               </div>
-
               {isParticipant && (
                 <div className="mt-6 p-3 bg-muted rounded-md">
                   <div className="flex items-center gap-2">
