@@ -93,12 +93,13 @@ export function Web3Provider({ children }) {
     setAddress(null);
     setBalance("0");
     setConnected(false);
+    setConnecting(false);
     localStorage.removeItem("walletConnected");
-
+  
     toast.info("Wallet disconnected", {
       description: "Your wallet has been disconnected",
     });
-  };
+  };  
 
   // Mock joining a tournament
   const joinTournament = async (tournamentId, entryFee) => {
