@@ -73,7 +73,9 @@ export default function TournamentDetailsPage() {
         prize: ethers.formatEther(totalPrize),
         maxParticipants: Number(maxParticipants),
         registeredParticipants: Number(registeredParticipants),   
-        participantList: participants,
+        participantList: Array.from(participants).map((address) => ({
+          address
+        })),
         startDate: new Date(Number(startTime) * 1000).toLocaleDateString(),
         status: mapStatus(status),
         currentRound,
