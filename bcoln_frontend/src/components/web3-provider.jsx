@@ -3,6 +3,8 @@
 import { createContext, useContext, useState, useEffect } from "react"
 import { toast } from "sonner"
 import { ethers, parseEther, formatEther } from "ethers";
+import { getContract } from "@/lib/contracts";
+import { clearAllSubmissionsForAddress } from "@/lib/submissions";
 
 import TournamentContractData from '../../lib/contracts/TournamentContract.json'; 
 
@@ -90,6 +92,9 @@ export function Web3Provider({ children }) {
   };
 
   const disconnect = () => {
+    if (address) {
+      clearAllSubmissionsForAddress(address);
+    }
     setAddress(null);
     setBalance("0");
     setConnected(false);
@@ -125,12 +130,10 @@ export function Web3Provider({ children }) {
   const createTournament = async (tournamentData) => {
     if (!connected) throw new Error("Wallet not connected")
 
-      const contractAddress = TournamentContractData.address
-      const contractABI = TournamentContractData.abi
-
-      const ethProvider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await ethProvider.getSigner();
-      const contract = new ethers.Contract(contractAddress, contractABI, signer);
+      const contract = await getContract(
+        TournamentContractData.abi,
+        TournamentContractData.address
+      );
     
       try {
         // Call the smart contract to create a tournament

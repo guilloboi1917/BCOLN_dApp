@@ -550,7 +550,9 @@ contract TournamentContract {
             });
         }
 
-        console.log(summaries[0].name);
+        if (tournamentCount > 0) {
+            console.log(summaries[0].name);
+        }
 
         return summaries;
     }

@@ -90,6 +90,7 @@ export function WalletConnect({ className }) {
 
   return (
     <Button
+      variant="outline"
       onClick={() => {
         if (!connecting) connect();
       }}
@@ -99,6 +100,5 @@ export function WalletConnect({ className }) {
       <Wallet className="h-4 w-4" />
       <span>{connecting ? "Connecting..." : "Connect Wallet"}</span>
     </Button>
-
   );
 }

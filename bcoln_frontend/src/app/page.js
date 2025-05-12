@@ -8,6 +8,9 @@ import { TournamentCard } from "@/components/tournament-card";
 import { WalletConnect } from "@/components/wallet-connect";
 import { Trophy, Users, Calendar, TrendingUp } from "lucide-react";
 import { ethers } from "ethers"
+import { getContract } from "@/lib/contracts";
+import { mapStatus } from "@/lib/status";
+
 
 import TournamentContractData from '../../lib/contracts/TournamentContract.json'; 
 
@@ -17,12 +20,10 @@ export default function Home() {
   useEffect(() => {
     const fetchFeaturedTournaments = async () => {
       try {
-        const provider = new ethers.BrowserProvider(window.ethereum)
-        const contract = new ethers.Contract(
-          TournamentContractData.address,
+        const contract = await getContract(
           TournamentContractData.abi,
-          await provider.getSigner()
-        )
+          TournamentContractData.address
+        );
 
         const data = await contract.getAllTournaments()
 
@@ -50,10 +51,6 @@ export default function Home() {
 
     fetchFeaturedTournaments()
   }, [])
-
-  const mapStatus = (statusId) => {
-    return ["open", "active", "completed", "cancelled"][statusId] || "unknown"
-  }
 
   return (
     <main className="container mx-auto px-4 py-8">

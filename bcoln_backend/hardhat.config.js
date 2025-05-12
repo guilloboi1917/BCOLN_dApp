@@ -6,7 +6,7 @@ require("@nomicfoundation/hardhat-ignition-ethers");
 task("reset-node", "Resets the local Hardhat node", async () => {
   const { ethers } = require("hardhat");
   await ethers.provider.send("hardhat_reset", []);
-  console.log("✅ Local node reset.");
+  console.log("Local node reset.");
 });
 
 /** @type import('hardhat/config').HardhatUserConfig */

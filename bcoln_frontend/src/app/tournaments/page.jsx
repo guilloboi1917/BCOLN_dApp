@@ -12,6 +12,9 @@ import {
 import { TournamentCard } from "@/components/tournament-card";
 import { Search, Filter } from "lucide-react";
 import { ethers } from "ethers";
+import { mapStatus } from "@/lib/status";
+import { getContract } from "@/lib/contracts";
+
 
 import TournamentContractData from "../../../lib/contracts/TournamentContract.json";
 
@@ -24,13 +27,10 @@ export default function TournamentsPage() {
     const fetchTournaments = async () => {
       try {
         console.log(TournamentContractData)
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const contract = new ethers.Contract(
-          TournamentContractData.address,
+        const contract = await getContract(
           TournamentContractData.abi,
-          await provider.getSigner()
+          TournamentContractData.address
         );
-
         const data = await contract.getAllTournaments();
         console.log("Fetched tournament data: ", data);
         const parsed = data.map((t) => ({
@@ -52,10 +52,6 @@ export default function TournamentsPage() {
 
     fetchTournaments();
   }, []);
-
-  const mapStatus = (statusId) => {
-    return ["open", "active", "completed", "cancelled"][statusId] || "unknown";
-  };
 
   const filteredTournaments = tournaments.filter((tournament) => {
     const matchesSearch = tournament.title
