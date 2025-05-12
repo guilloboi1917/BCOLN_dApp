@@ -29,29 +29,21 @@ import {
 import { ethers } from "ethers";
 import { useRef } from "react";
 
-
-import TournamentContractData from "../../../../lib/contracts/TournamentContract.json";
+import TournamentContractData from "@/../lib/contracts/TournamentContract.json";
 import MatchContractData from "../../../../lib/contracts/MatchContract.json";
 import ReputationRegistryData from "../../../../lib/contracts/ReputationRegistry.json";
 
-
-
 const getMatchDisplayStatus = (status) => {
-  if (
-    status === "pending" ||
-    status === "commit" ||
-    status === "reveal"
-  )
+  if (status === "pending" || status === "commit" || status === "reveal")
     return "Pending";
   if (status === "dispute") return "Disputed";
   if (status === "completed") return "Completed";
   return "Unknown";
 };
 
-
 export default function TournamentDetailsPage() {
   const { id } = useParams();
-  const { connected, address, joinTournament } = useWeb3();
+  const { connected, address } = useWeb3();
   const [isJoining, setIsJoining] = useState(false);
   const [tournament, setTournament] = useState(null);
   const [tournamentMatches, setTournamentMatches] = useState([]);
@@ -60,8 +52,6 @@ export default function TournamentDetailsPage() {
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [joiningMatchAddress, setJoiningMatchAddress] = useState(null);
   const lastKnownRound = useRef(null);
-
-
 
   const fetchTournament = async () => {
     setIsLoading(true);
@@ -73,6 +63,7 @@ export default function TournamentDetailsPage() {
         await provider.getSigner()
       );
 
+      console.log(contract);
       console.log("ID", id);
 
       const [
@@ -85,47 +76,40 @@ export default function TournamentDetailsPage() {
         status,
         currentRound,
         totalRounds,
-        totalPrize
+        totalPrize,
+        participants,
       ] = await contract.getTournamentDetails(id);
-      
-      const participants = await contract.getTournamentParticipants(id);
-      const [bracketTotalRounds, bracketCurrentRound, matches] = await contract.getTournamentBracket(id);
-      console.log("Contract reports:", {
-        bracketTotalRounds: Number(bracketTotalRounds),
-        bracketCurrentRound: Number(bracketCurrentRound),
-        rawMatches: matches
-      });
-      
-      const allMatches = await contract.getAllTournamentMatches(id);
-      const groupedMatches = Array.from({ length: Number(totalRounds) }, () => []);
+
+      const _matches = await contract.getAllTournamentMatches(id);
+      console.log(_matches);
+
+      const allMatches = _matches;
+      const groupedMatches = Array.from(
+        { length: Number(totalRounds) },
+        () => []
+      );
 
       for (const match of allMatches) {
-        console.log("Processing match:", {
-          round: Number(match.roundNumber),
-          address: match.matchAddress,
-          status: Number(match.status)
-        });
-        
-        if (Number(match.roundNumber) > 0 && Number(match.roundNumber) <= totalRounds) {
-          const matchContract = new ethers.Contract(
-            match.matchAddress,
-            MatchContractData.abi,
-            provider
-          );
-      
-          const [player1Joined, player2Joined] = await matchContract.havePlayersJoined();
-      
-          groupedMatches[Number(match.roundNumber) - 1].push({
-            matchAddress: match.matchAddress,
-            player1: match.player1,
-            player2: match.player2,
-            winner: match.winner,
-            roundNumber: match.roundNumber,
-            matchIndex: match.matchIndex,
-            status: match.status,
-            player1Joined,
-            player2Joined
-          });
+        const parsedMatch = {
+          matchAddress: match[0],
+          tournamentId: match[1],
+          player1: match[2],
+          player2: match[3],
+          winner: match[4],
+          roundNumber: Number(match[5]),
+          matchIndex: match[6],
+          player1Joined: match[7],
+          player2Joined: match[8],
+          status: match[9],
+        };
+
+        console.log("Processing match:", match);
+
+        if (
+          Number(parsedMatch.roundNumber) > 0 &&
+          Number(parsedMatch.roundNumber) <= totalRounds
+        ) {
+          groupedMatches[Number(match.roundNumber) - 1].push(match);
         }
       }
       console.log("Grouped matches for UI:", groupedMatches);
@@ -138,23 +122,22 @@ export default function TournamentDetailsPage() {
         entryFee: ethers.formatEther(entryFee),
         prize: ethers.formatEther(totalPrize),
         maxParticipants: Number(maxParticipants),
-        registeredParticipants: Number(registeredParticipants),   
+        registeredParticipants: Number(registeredParticipants),
         participantList: Array.from(participants).map((address) => ({
-          address
+          address,
         })),
         startDate: new Date(Number(startTime) * 1000).toLocaleDateString(),
         status: mapStatus(status),
         currentRound,
         totalRounds,
         totalPrize: ethers.formatEther(totalPrize),
-        matches
+        _matches,
       };
 
       console.log("LIST", parsedTournament.participantList);
 
       setTournament(parsedTournament);
       lastKnownRound.current = Number(parsedTournament.currentRound);
-
     } catch (error) {
       console.error("Error fetching tournament:", error);
       toast.error("Error loading tournament", {
@@ -171,7 +154,7 @@ export default function TournamentDetailsPage() {
 
   useEffect(() => {
     if (!id) return;
-  
+
     const interval = setInterval(async () => {
       try {
         const provider = new ethers.BrowserProvider(window.ethereum);
@@ -180,10 +163,14 @@ export default function TournamentDetailsPage() {
           TournamentContractData.abi,
           provider
         );
-  
-        const [, , , , , , , currentRound] = await contract.getTournamentDetails(id);
-  
-        if (lastKnownRound.current !== null && Number(currentRound) > lastKnownRound.current) {
+
+        const [, , , , , , , currentRound] =
+          await contract.getTournamentDetails(id);
+
+        if (
+          lastKnownRound.current !== null &&
+          Number(currentRound) > lastKnownRound.current
+        ) {
           console.log("New round detected — refreshing UI");
           await fetchTournament(); // triggers match fetch + re-render
         }
@@ -191,10 +178,9 @@ export default function TournamentDetailsPage() {
         console.error("Error polling tournament round:", error);
       }
     }, 10000); // every 10 seconds
-  
+
     return () => clearInterval(interval);
   }, [id]);
-  
 
   const mapStatus = (statusId) => {
     return ["open", "active", "completed", "cancelled"][statusId] || "unknown";
@@ -220,19 +206,18 @@ export default function TournamentDetailsPage() {
       const tx = await contract.registerForTournament(id, {
         value: ethers.parseEther(tournament.entryFee),
       });
-      
+
       toast.success("Transaction submitted!", {
         description: "Waiting for confirmation...",
       });
-      
+
       await tx.wait(); // wait until the tx is mined on-chain
-      
+
       toast.success("Successfully joined!", {
         description: "You have successfully joined the tournament",
       });
-      
-      await fetchTournament(); // fetch updated data      
 
+      await fetchTournament(); // fetch updated data
     } catch (error) {
       console.error("Error joining tournament:", error);
       toast.error("Error joining tournament", {
@@ -252,12 +237,12 @@ export default function TournamentDetailsPage() {
         TournamentContractData.abi,
         await provider.getSigner()
       );
-  
+
       const tx = await contract.startTournament(id);
       toast.success("Tournament starting...", {
         description: "Waiting for confirmation...",
       });
-  
+
       await tx.wait();
       toast.success("Tournament started!");
       await fetchTournament();
@@ -279,19 +264,23 @@ export default function TournamentDetailsPage() {
       setJoiningMatchAddress(match.matchAddress);
 
       console.log(match.matchAddress);
-  
+
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
-      const matchContract = new ethers.Contract(match.matchAddress, MatchContractData.abi, signer);
-  
+      const matchContract = new ethers.Contract(
+        match.matchAddress,
+        MatchContractData.abi,
+        signer
+      );
+
       const entryFee = await matchContract.getEntryFee();
-  
+
       const tx = await matchContract.joinMatch({ value: entryFee });
-      
+
       toast.success("Joining match...");
-  
+
       await tx.wait();
-  
+
       toast.success("You joined the match!");
       await fetchTournament();
     } catch (error) {
@@ -308,8 +297,12 @@ export default function TournamentDetailsPage() {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
-      const matchContract = new ethers.Contract(match.matchAddress, MatchContractData.abi, signer);
-  
+      const matchContract = new ethers.Contract(
+        match.matchAddress,
+        MatchContractData.abi,
+        signer
+      );
+
       // Get ReputationRegistry address from matchContract
       const repRegistryAddress = await matchContract.reputationRegistry();
       const repContract = new ethers.Contract(
@@ -317,29 +310,28 @@ export default function TournamentDetailsPage() {
         ReputationRegistryData.abi,
         signer
       );
-      
-  
+
       // Get required stake amount based on player's reputation
       const stakeAmount = await repContract.getStakeAmount(address);
-  
+
       // Generate a random salt
       const saltBytes = ethers.randomBytes(32);
       const salt = ethers.hexlify(saltBytes);
-  
+
       // Determine if current user is the winner
       const didIWin = address.toLowerCase() === winner.toLowerCase();
-  
+
       // Submit result with stake
       const tx = await matchContract.commitAndRevealResult(salt, didIWin, {
         value: stakeAmount,
       });
-  
+
       toast.success("Submitting result...", {
         description: "Waiting for confirmation...",
       });
-  
+
       await tx.wait();
-  
+
       toast.success("Match result submitted successfully!");
       const submissionKey = `${match.matchAddress.toLowerCase()}-${address.toLowerCase()}-submitted`;
       localStorage.setItem(submissionKey, "true");
@@ -352,8 +344,7 @@ export default function TournamentDetailsPage() {
       });
     }
   };
-  
-  
+
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[60vh]">
@@ -384,24 +375,18 @@ export default function TournamentDetailsPage() {
     );
   }
 
-
   const isParticipant = tournament.participantList.some(
     (p) => p.address.toLowerCase() === address?.toLowerCase()
   );
-  
-  const isFull = tournament.registeredParticipants >= tournament.maxParticipants;
-  
+
+  const isFull =
+    tournament.registeredParticipants >= tournament.maxParticipants;
+
   const isJoinDisabled =
-    isJoining ||
-    isFull ||
-    isParticipant ||
-    tournament.status !== "open";  
+    isJoining || isFull || isParticipant || tournament.status !== "open";
 
   const canStartTournament =
-    isParticipant &&
-    isFull &&
-    tournament.status === "open";
-
+    isParticipant && isFull && tournament.status === "open";
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -410,7 +395,8 @@ export default function TournamentDetailsPage() {
           <h1 className="text-3xl font-bold">{tournament.title}</h1>
           <div className="flex flex-wrap gap-2 mt-2">
             <Badge variant="default">
-              {tournament.status === "open" && tournament.registeredParticipants < tournament.maxParticipants
+              {tournament.status === "open" &&
+              tournament.registeredParticipants < tournament.maxParticipants
                 ? "Open for Entry"
                 : "Active"}
             </Badge>
@@ -433,10 +419,7 @@ export default function TournamentDetailsPage() {
             Start Tournament
           </Button>
 
-          <Button
-            onClick={handleJoinTournament}
-            disabled={isJoinDisabled}
-          >
+          <Button onClick={handleJoinTournament} disabled={isJoinDisabled}>
             {isJoining
               ? "Joining..."
               : `Join Tournament (${tournament.entryFee})`}
@@ -509,7 +492,8 @@ export default function TournamentDetailsPage() {
               <div className="flex justify-between items-center">
                 <span className="text-sm">Registration</span>
                 <Badge variant="default">
-                  {tournament.status === "open" && tournament.registeredParticipants < tournament.maxParticipants
+                  {tournament.status === "open" &&
+                  tournament.registeredParticipants < tournament.maxParticipants
                     ? "Open"
                     : "Closed"}
                 </Badge>
@@ -595,176 +579,235 @@ export default function TournamentDetailsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-            {tournamentMatches.flat().length > 0 ? (
-              <div className="space-y-4">
-                {tournamentMatches
-                  .flat()
-                  .sort((a, b) => {
-                    const order = ["pending", "commit", "reveal", "completed", "dispute"];
-                    return order.indexOf(a.status) - order.indexOf(b.status);
-                  })
-                  .map((match, index) => {
-                    const submissionKey = `${match.matchAddress.toLowerCase()}-${address?.toLowerCase()}-submitted`;
-                    const hasSubmittedResult = typeof window !== "undefined" &&
-                      localStorage.getItem(submissionKey) === "true";
+              {tournamentMatches.flat().length > 0 ? (
+                <div className="space-y-4">
+                  {tournamentMatches
+                    .flat()
+                    .sort((a, b) => {
+                      const order = [
+                        "pending",
+                        "commit",
+                        "reveal",
+                        "completed",
+                        "dispute",
+                      ];
+                      return order.indexOf(a.status) - order.indexOf(b.status);
+                    })
+                    .map((match, index) => {
+                      const submissionKey = `${match.matchAddress.toLowerCase()}-${address?.toLowerCase()}-submitted`;
+                      const hasSubmittedResult =
+                        typeof window !== "undefined" &&
+                        localStorage.getItem(submissionKey) === "true";
 
-                    const numericStatus = Number(match.status);
-                    console.log("Match", match.matchAddress);
-                    if (address) {
-                      console.log("You are player1?", match.player1.toLowerCase() === address.toLowerCase());
-                    }
-                    
-                    console.log("player1Joined:", match.player1Joined);
-                    console.log("player2Joined:", match.player2Joined);
+                      const numericStatus = Number(match.status);
+                      console.log("Match", match.matchAddress);
+                      if (address) {
+                        console.log(
+                          "You are player1?",
+                          match.player1.toLowerCase() === address.toLowerCase()
+                        );
+                      }
 
-                    const statusLabels = ["pending", "commit", "reveal", "dispute", "completed"];
-                    const statusString = statusLabels[numericStatus] ?? "unknown";
-                    
-                    const isUserParticipant = address
-                      ? match.player1?.toLowerCase() === address.toLowerCase() ||
-                        match.player2?.toLowerCase() === address.toLowerCase()
-                      : false;
+                      console.log("player1Joined:", match.player1Joined);
+                      console.log("player2Joined:", match.player2Joined);
 
+                      const statusLabels = [
+                        "pending",
+                        "commit",
+                        "reveal",
+                        "dispute",
+                        "completed",
+                      ];
+                      const statusString =
+                        statusLabels[numericStatus] ?? "unknown";
 
-                    return (
-                    <div key={index} className="border rounded-xl p-4 shadow-sm bg-muted/20">
-                      {/* Top Row: Round & Status */}
-                      <div className="flex justify-between items-center mb-2">
-                        <Badge
-                          className={`text-xs ${
-                            statusString === "pending"
-                              ? "bg-orange-500"
-                              : statusString === "commit"
-                              ? "bg-yellow-500"
-                              : statusString === "reveal"
-                              ? "bg-blue-500"
-                              : statusString === "dispute"
-                              ? "bg-red-500"
-                              : statusString === "completed"
-                              ? "bg-green-500"
-                              : "bg-gray-400"
-                          } text-white`}
+                      const isUserParticipant = address
+                        ? match.player1?.toLowerCase() ===
+                            address.toLowerCase() ||
+                          match.player2?.toLowerCase() === address.toLowerCase()
+                        : false;
+
+                      return (
+                        <div
+                          key={index}
+                          className="border rounded-xl p-4 shadow-sm bg-muted/20"
                         >
-                          {getMatchDisplayStatus(statusString)}
-                        </Badge>
-                      </div>
-
-                      {/* Middle Row: Players */}
-                      <div className="flex justify-between items-center flex-wrap gap-2 mb-3">
-                        <div className="flex-1 font-mono text-sm text-muted-foreground truncate">
-                          {match.player1}
-                        </div>
-                        <span className="text-xs text-muted-foreground">vs</span>
-                        <div className="flex-1 text-right font-mono text-sm text-muted-foreground truncate">
-                          {match.player2}
-                        </div>
-                      </div>
-
-                      {/* Bottom Row: Actions */}
-                      <div className="flex justify-between items-center flex-wrap gap-2">
-                        {isUserParticipant ? (
-                         <div className="text-sm text-muted-foreground italic flex-1">
-                            {match.winner !== "0x0000000000000000000000000000000000000000" ? (
-                              <>
-                                Winner: <span className="font-semibold text-foreground">{match.winner}</span>
-                              </>
-                            ) : numericStatus === 0 ? (
-                              (() => {
-                                const isPlayer1 = match.player1?.toLowerCase() === address?.toLowerCase();
-                                const isPlayer2 = match.player2?.toLowerCase() === address?.toLowerCase();
-                                if ((isPlayer1 && !match.player1Joined) || (isPlayer2 && !match.player2Joined)) {
-                                  return "You haven't joined the match.";
-                                }
-                                if ((isPlayer1 && match.player1Joined && !match.player2Joined) ||
-                                    (isPlayer2 && match.player2Joined && !match.player1Joined)) {
-                                  return "Waiting for opponent to join.";
-                                }
-                                return "Waiting for match to start.";
-                              })()
-                            ) : numericStatus === 1 ? (
-                              hasSubmittedResult
-                                ? "You’ve submitted your result. Waiting for opponent."
-                                : "Match started. Waiting for result submission."
-                            )
-                             : numericStatus === 2 ? (
-                              // Reveal phase
-                              "Result hasn't been revealed yet."
-                            ) : numericStatus === 3 ? (
-                              // Dispute phase
-                              "Match in dispute."
-                            ) : null}
+                          {/* Top Row: Round & Status */}
+                          <div className="flex justify-between items-center mb-2">
+                            <Badge
+                              className={`text-xs ${
+                                statusString === "pending"
+                                  ? "bg-orange-500"
+                                  : statusString === "commit"
+                                  ? "bg-yellow-500"
+                                  : statusString === "reveal"
+                                  ? "bg-blue-500"
+                                  : statusString === "dispute"
+                                  ? "bg-red-500"
+                                  : statusString === "completed"
+                                  ? "bg-green-500"
+                                  : "bg-gray-400"
+                              } text-white`}
+                            >
+                              {getMatchDisplayStatus(statusString)}
+                            </Badge>
                           </div>
-                       
-                        
-                        ) : (
-                          match.winner !== "0x0000000000000000000000000000000000000000" && (
-                            <div className="text-sm text-muted-foreground italic flex-1">
-                              Winner: <span className="font-semibold text-foreground">{match.winner}</span>
+
+                          {/* Middle Row: Players */}
+                          <div className="flex justify-between items-center flex-wrap gap-2 mb-3">
+                            <div className="flex-1 font-mono text-sm text-muted-foreground truncate">
+                              {match.player1}
                             </div>
-                          )
-                        )}
+                            <span className="text-xs text-muted-foreground">
+                              vs
+                            </span>
+                            <div className="flex-1 text-right font-mono text-sm text-muted-foreground truncate">
+                              {match.player2}
+                            </div>
+                          </div>
 
-                        <div className="flex gap-2">
-                        {numericStatus === 0 &&
-                          isUserParticipant && (() => {
-                            const isPlayer1 = match.player1?.toLowerCase() === address?.toLowerCase();
-                            const isPlayer2 = match.player2?.toLowerCase() === address?.toLowerCase();
-                            const hasNotJoined = (isPlayer1 && !match.player1Joined) || (isPlayer2 && !match.player2Joined);
+                          {/* Bottom Row: Actions */}
+                          <div className="flex justify-between items-center flex-wrap gap-2">
+                            {isUserParticipant ? (
+                              <div className="text-sm text-muted-foreground italic flex-1">
+                                {match.winner !==
+                                "0x0000000000000000000000000000000000000000" ? (
+                                  <>
+                                    Winner:{" "}
+                                    <span className="font-semibold text-foreground">
+                                      {match.winner}
+                                    </span>
+                                  </>
+                                ) : numericStatus === 0 ? (
+                                  (() => {
+                                    const isPlayer1 =
+                                      match.player1?.toLowerCase() ===
+                                      address?.toLowerCase();
+                                    const isPlayer2 =
+                                      match.player2?.toLowerCase() ===
+                                      address?.toLowerCase();
+                                    if (
+                                      (isPlayer1 && !match.player1Joined) ||
+                                      (isPlayer2 && !match.player2Joined)
+                                    ) {
+                                      return "You haven't joined the match.";
+                                    }
+                                    if (
+                                      (isPlayer1 &&
+                                        match.player1Joined &&
+                                        !match.player2Joined) ||
+                                      (isPlayer2 &&
+                                        match.player2Joined &&
+                                        !match.player1Joined)
+                                    ) {
+                                      return "Waiting for opponent to join.";
+                                    }
+                                    return "Waiting for match to start.";
+                                  })()
+                                ) : numericStatus === 1 ? (
+                                  hasSubmittedResult ? (
+                                    "You’ve submitted your result. Waiting for opponent."
+                                  ) : (
+                                    "Match started. Waiting for result submission."
+                                  )
+                                ) : numericStatus === 2 ? (
+                                  // Reveal phase
+                                  "Result hasn't been revealed yet."
+                                ) : numericStatus === 3 ? (
+                                  // Dispute phase
+                                  "Match in dispute."
+                                ) : null}
+                              </div>
+                            ) : (
+                              match.winner !==
+                                "0x0000000000000000000000000000000000000000" && (
+                                <div className="text-sm text-muted-foreground italic flex-1">
+                                  Winner:{" "}
+                                  <span className="font-semibold text-foreground">
+                                    {match.winner}
+                                  </span>
+                                </div>
+                              )
+                            )}
 
-                            return hasNotJoined ? (
-                              <Button
-                                size="sm"
-                                variant="default"
-                                disabled={joiningMatchAddress === match.matchAddress}
-                                onClick={() => joinMatchForUser(match)}
-                              >
-                                {joiningMatchAddress === match.matchAddress ? "Joining..." : "Join Match"}
-                              </Button>
-                            ) : null;
-                          })()}
+                            <div className="flex gap-2">
+                              {numericStatus === 0 &&
+                                isUserParticipant &&
+                                (() => {
+                                  const isPlayer1 =
+                                    match.player1?.toLowerCase() ===
+                                    address?.toLowerCase();
+                                  const isPlayer2 =
+                                    match.player2?.toLowerCase() ===
+                                    address?.toLowerCase();
+                                  const hasNotJoined =
+                                    (isPlayer1 && !match.player1Joined) ||
+                                    (isPlayer2 && !match.player2Joined);
 
-                          {isUserParticipant && numericStatus === 1 && !hasSubmittedResult && (
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={() => handleReportMatch(match)}
-                            >
-                              Report Match Result
-                            </Button>
-                          )}
+                                  return hasNotJoined ? (
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      disabled={
+                                        joiningMatchAddress ===
+                                        match.matchAddress
+                                      }
+                                      onClick={() => joinMatchForUser(match)}
+                                    >
+                                      {joiningMatchAddress ===
+                                      match.matchAddress
+                                        ? "Joining..."
+                                        : "Join Match"}
+                                    </Button>
+                                  ) : null;
+                                })()}
 
-                          {isUserParticipant && numericStatus === 2 && (
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={() => handleReportMatch(match)}
-                            >
-                              Report Match Result
-                            </Button>
-                          )}
+                              {isUserParticipant &&
+                                numericStatus === 1 &&
+                                !hasSubmittedResult && (
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => handleReportMatch(match)}
+                                  >
+                                    Report Match Result
+                                  </Button>
+                                )}
 
-                          {statusString === "dispute" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => toast.info("Jury functionality coming soon")}
-                            >
-                              Resolve as Juror
-                            </Button>
-                          )}
+                              {isUserParticipant && numericStatus === 2 && (
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  onClick={() => handleReportMatch(match)}
+                                >
+                                  Report Match Result
+                                </Button>
+                              )}
+
+                              {statusString === "dispute" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    toast.info("Jury functionality coming soon")
+                                  }
+                                >
+                                  Resolve as Juror
+                                </Button>
+                              )}
+                            </div>
+                          </div>
                         </div>
-
-                      </div>
-                    </div>
-
-                    );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No matches scheduled yet</p>
-              </div>
-            )}
+                      );
+                    })}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    No matches scheduled yet
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -776,7 +819,7 @@ export default function TournamentDetailsPage() {
         onSubmit={async ({ winner, match }) => {
           await handleMatchResultSubmit({ match, winner });
           setReportDialogOpen(false);
-        }}        
+        }}
       />
     </div>
   );

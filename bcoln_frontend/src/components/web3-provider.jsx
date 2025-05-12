@@ -163,6 +163,18 @@ export function Web3Provider({ children }) {
       }
   }
 
+  const getTournamentInformation = async(id) => {
+    if (!connected) throw new Error("Wallet not connected");
+
+    try {
+
+      
+    } catch (error) {
+      
+    }
+
+  }
+
   const signMessage = async (message) => {
     if (!connected) throw new Error("Wallet not connected");
   

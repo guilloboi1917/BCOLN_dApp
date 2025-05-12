@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "./ReputationRegistry.sol";
 import "hardhat/console.sol";
+import "./TournamentContract.sol";
 
 interface ITournament {
     function reportMatchResult(
@@ -185,6 +186,8 @@ contract MatchContract {
             MatchStatus matchStatus,
             uint256 matchRound,
             uint256 matchIdx,
+            bool player1Joined,
+            bool player2Joined,
             uint256 juryCount
         )
     {
@@ -195,6 +198,8 @@ contract MatchContract {
             status,
             roundNumber,
             matchIndex,
+            currentMatch.player1Joined,
+            currentMatch.player2Joined,
             currentMatch.juryPool.length
         );
     }
@@ -484,53 +489,65 @@ contract MatchContract {
             console.log("Tournament details: id=", tournamentId);
             console.log("Reporting to tournament. ID:", tournamentId);
 
-            try
-                ITournament(address(tournamentContract)).reportMatchResult(
-                    tournamentId,
-                    roundNumber,
-                    matchIndex,
-                    winner
-                )
-            {
-                // Success - no action needed
-            } catch (bytes memory reason) {
-                // Log but continue execution
-                console.log(
-                    "Tournament report failed:",
-                    reason.length > 0 ? string(reason) : "No reason provided"
-                );
+            TournamentContract tournament = TournamentContract(
+                payable(address(tournamentContract))
+            );
 
-                // (bool success, bytes memory returnData) = address(
-                //     tournamentContract
-                // ).call(
-                //         abi.encodeWithSignature(
-                //             "reportMatchResult(uint256,uint256,uint256,address)",
-                //             tournamentId,
-                //             roundNumber,
-                //             matchIndex,
-                //             winner
-                //         )
-                //     );
-                // if (!success) {
-                //     // This will give you the revert reason in the console if available
-                //     console.log("Failed to report match to tournament");
-                //     if (returnData.length > 0) {
-                //         // Extract the revert reason
-                //         assembly {
-                //             let returndata_size := mload(returnData)
-                //             revert(add(32, returnData), returndata_size)
-                //         }
-                //     }
-                // }
-                // // If reporting to tournament fails, we still want to pay the winner
-                // if (!success) {
-                //     console.log("Failed to report match to tournament");
-                // }
-            }
-        } else {
-            // Only pay winner directly for non-tournament matches
-            payable(winner).transfer(currentMatch.entryFee * 2);
+            // try
+            tournament.reportMatchResult(
+                tournamentId,
+                roundNumber,
+                matchIndex,
+                winner
+            );
         }
+        // ITournament(address(tournamentContract)).reportMatchResult(
+        //     tournamentId,
+        //     roundNumber,
+        //     matchIndex,
+        //     winner
+        // )
+        // {
+        //     console.log("Successfully reported match result to tournament");
+        //     // Success - no action needed
+        // } catch (bytes memory reason) {
+        //     // Log but continue execution
+        //     console.log(
+        //         "Tournament report failed:",
+        //         reason.length > 0 ? string(reason) : "No reason provided"
+        //     );
+
+        // (bool success, bytes memory returnData) = address(
+        //     tournamentContract
+        // ).call(
+        //         abi.encodeWithSignature(
+        //             "reportMatchResult(uint256,uint256,uint256,address)",
+        //             tournamentId,
+        //             roundNumber,
+        //             matchIndex,
+        //             winner
+        //         )
+        //     );
+        // if (!success) {
+        //     // This will give you the revert reason in the console if available
+        //     console.log("Failed to report match to tournament");
+        //     if (returnData.length > 0) {
+        //         // Extract the revert reason
+        //         assembly {
+        //             let returndata_size := mload(returnData)
+        //             revert(add(32, returnData), returndata_size)
+        //         }
+        //     }
+        // }
+        // // If reporting to tournament fails, we still want to pay the winner
+        // if (!success) {
+        //     console.log("Failed to report match to tournament");
+        // }
+        // }
+        // } else {
+        //     // Only pay winner directly for non-tournament matches
+        //     payable(winner).transfer(currentMatch.entryFee * 2);
+        // }
 
         // Payout
         emit MatchResolved(winner);

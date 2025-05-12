@@ -32,6 +32,7 @@ export default function TournamentsPage() {
         );
 
         const data = await contract.getAllTournaments();
+        console.log("Fetched tournament data: ", data);
         const parsed = data.map((t) => ({
           id: t.id.toString(),
           title: t.name,

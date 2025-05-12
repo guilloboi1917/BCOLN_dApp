@@ -15,14 +15,17 @@ contract TournamentContract {
         Cancelled // Tournament was cancelled
     }
 
-    struct MatchInfo {
+    struct TournamentMatchInfo {
         address matchAddress;
+        uint256 tournamentId;
         address player1;
         address player2;
         address winner; // address(0) if not determined yet
         uint256 roundNumber;
         uint256 matchIndex;
-        MatchContract.MatchStatus status;
+        bool player1Joined;
+        bool player2Joined;
+        uint status;
     }
 
     // Tournament structure
@@ -55,7 +58,7 @@ contract TournamentContract {
         uint256 maxParticipants;
         uint256 registeredParticipants;
         uint256 startTime;
-        TournamentStatus status;
+        uint status;
         uint256 totalPrize;
     }
 
@@ -257,6 +260,11 @@ contract TournamentContract {
             _createMatchesForRound(_tournamentId, tournament.participants);
         } else {
             // For subsequent rounds, use winners from previous round
+            console.log(
+                tournament.roundWinners[_roundNumber - 1][0],
+                tournament.roundWinners[_roundNumber - 1][1]
+            );
+
             _createMatchesForRound(
                 _tournamentId,
                 tournament.roundWinners[_roundNumber - 1]
@@ -282,39 +290,34 @@ contract TournamentContract {
         tournament.matchCount[tournament.currentRound] = matchCount;
         tournament.completedMatches[tournament.currentRound] = 0;
 
-        console.log("Tournament name: ", tournaments[_tournamentId].name);
-
         for (uint256 i = 0; i < matchCount; i++) {
             address player1 = _players[i * 2];
             address player2 = _players[(i * 2) + 1];
 
             // Create a tournament match for these two players
-            try
-                factory.createTournamentMatch(
-                    player1,
-                    player2,
-                    tournament.entryFee,
-                    address(this),
-                    _tournamentId,
-                    tournament.currentRound,
-                    i
-                )
-            returns (address matchAddress) {
-                uint256 matchId = (tournament.currentRound * 1000) + i;
-                console.log(
-                    "Stored matchContract: ",
-                    tournament.matchContracts[matchId]
-                );
-                tournament.matchContracts[matchId] = matchAddress;
+            // try
+            address matchAddress = factory.createTournamentMatch(
+                player1,
+                player2,
+                tournament.entryFee,
+                address(this),
+                _tournamentId,
+                tournament.currentRound,
+                i
+            );
+            // returns (address matchAddress)
+            // {
+            uint256 matchId = (tournament.currentRound * 1000) + i;
+            tournament.matchContracts[matchId] = matchAddress;
 
-                emit MatchCreated(
-                    _tournamentId,
-                    tournament.currentRound,
-                    matchAddress
-                );
-            } catch (bytes memory reason) {
-                console.log("Match creation failed:", string(reason));
-            }
+            emit MatchCreated(
+                _tournamentId,
+                tournament.currentRound,
+                matchAddress
+            );
+            // } catch (bytes memory reason) {
+            //     console.log("Match creation failed:", string(reason));
+            // }
 
             // // Store the match contract address
             // // We calculate a unique match ID based on round and match index
@@ -434,6 +437,9 @@ contract TournamentContract {
         tournament.winner = winner;
         tournament.status = TournamentStatus.Completed;
 
+        console.log("Tournament Status set to Complete");
+        console.log(uint(tournament.status));
+
         // Distribute prize - now includes all collected match funds
         uint256 totalPrize = address(this).balance;
         payable(winner).transfer(totalPrize);
@@ -539,7 +545,7 @@ contract TournamentContract {
                 maxParticipants: t.maxParticipants,
                 registeredParticipants: t.registeredParticipants,
                 startTime: t.startTime,
-                status: t.status,
+                status: uint(t.status),
                 totalPrize: t.totalPrize
             });
         }
@@ -578,51 +584,13 @@ contract TournamentContract {
     }
 
     /**
-     * @dev Get all match information for a specific tournament round
-     * @param _tournamentId ID of the tournament
-     * @param _roundNumber Round number
-     * @return Array of match information
-     */
-    function getRoundMatches(
-        uint256 _tournamentId,
-        uint256 _roundNumber
-    ) external view returns (MatchInfo[] memory) {
-        Tournament storage tournament = tournaments[_tournamentId];
-        uint256 matchCount = tournament.matchCount[_roundNumber];
-
-        MatchInfo[] memory matches = new MatchInfo[](matchCount);
-
-        for (uint256 i = 0; i < matchCount; i++) {
-            uint256 matchId = (_roundNumber * 1000) + i;
-            address matchAddress = tournament.matchContracts[matchId];
-
-            // Get match details from the match contract
-            MatchContract matchContract = MatchContract(matchAddress);
-            (address player1, address player2) = matchContract.getPlayers();
-            address winner = matchContract.getWinner();
-
-            matches[i] = MatchInfo({
-                matchAddress: matchAddress,
-                player1: player1,
-                player2: player2,
-                winner: winner, // Will be address(0) if not determined
-                roundNumber: _roundNumber,
-                matchIndex: i,
-                status: matchContract.getMatchStatus()
-            });
-        }
-
-        return matches;
-    }
-
-    /**
      * @dev Get all matches for all rounds in a tournament
      * @param _tournamentId ID of the tournament
      * @return Array of match information for all rounds
      */
     function getAllTournamentMatches(
         uint256 _tournamentId
-    ) external view returns (MatchInfo[] memory) {
+    ) external view returns (TournamentMatchInfo[] memory) {
         Tournament storage tournament = tournaments[_tournamentId];
 
         // Calculate total number of matches across all rounds
@@ -631,7 +599,9 @@ contract TournamentContract {
             totalMatches += tournament.matchCount[r];
         }
 
-        MatchInfo[] memory allMatches = new MatchInfo[](totalMatches);
+        TournamentMatchInfo[] memory allMatches = new TournamentMatchInfo[](
+            totalMatches
+        );
         uint256 currentIndex = 0;
 
         // Iterate through each round
@@ -640,12 +610,9 @@ contract TournamentContract {
 
             // Only include rounds that have started
             if (r <= tournament.currentRound) {
-                console.log("tournament round:");
-                console.log(tournament.currentRound);
                 for (uint256 i = 0; i < roundMatches; i++) {
                     uint256 matchId = (r * 1000) + i;
                     address matchAddress = tournament.matchContracts[matchId];
-                    console.log("match address:");
                     console.log(matchAddress);
 
                     if (matchAddress != address(0)) {
@@ -656,15 +623,24 @@ contract TournamentContract {
                         (address player1, address player2) = matchContract
                             .getPlayers();
                         address winner = matchContract.getWinner();
+                        (
+                            bool _player1Joined,
+                            bool _player2Joined
+                        ) = matchContract.havePlayersJoined();
 
-                        allMatches[currentIndex] = MatchInfo({
+                        uint matchStatus = uint(matchContract.getMatchStatus());
+
+                        allMatches[currentIndex] = TournamentMatchInfo({
                             matchAddress: matchAddress,
+                            tournamentId: _tournamentId,
                             player1: player1,
                             player2: player2,
                             winner: winner, // Will be address(0) if not determined
                             roundNumber: r,
                             matchIndex: i,
-                            status: matchContract.getMatchStatus()
+                            player1Joined: _player1Joined,
+                            player2Joined: _player2Joined,
+                            status: matchStatus
                         });
                         currentIndex++;
                     }
@@ -686,7 +662,7 @@ contract TournamentContract {
         uint256 _tournamentId,
         uint256 _roundNumber,
         uint256 _matchIndex
-    ) external view returns (MatchInfo memory) {
+    ) external view returns (TournamentMatchInfo memory) {
         Tournament storage tournament = tournaments[_tournamentId];
         uint256 matchId = (_roundNumber * 1000) + _matchIndex;
         address matchAddress = tournament.matchContracts[matchId];
@@ -695,70 +671,23 @@ contract TournamentContract {
 
         MatchContract matchContract = MatchContract(matchAddress);
         (address player1, address player2) = matchContract.getPlayers();
+        (bool _player1Joined, bool _player2Joined) = matchContract
+            .havePlayersJoined();
+
+        uint matchStatus = uint(matchContract.getMatchStatus());
 
         return
-            MatchInfo({
+            TournamentMatchInfo({
                 matchAddress: matchAddress,
+                tournamentId: _tournamentId,
                 player1: player1,
                 player2: player2,
                 winner: tournament.matchWinners[matchId], // Will be address(0) if not determined
                 roundNumber: _roundNumber,
                 matchIndex: _matchIndex,
-                status: matchContract.getMatchStatus()
+                player1Joined: _player1Joined,
+                player2Joined: _player2Joined,
+                status: matchStatus
             });
-    }
-
-    function getTournamentBracket(
-        uint256 _tournamentId
-    )
-        external
-        view
-        returns (
-            uint256 totalRounds,
-            uint256 currentRound,
-            MatchInfo[][] memory matches
-        )
-    {
-        Tournament storage tournament = tournaments[_tournamentId];
-
-        // Create the bracket structure - an array of arrays (rounds) of matches
-        matches = new MatchInfo[][](tournament.totalRounds);
-
-        console.log("CurrentRound");
-        console.log(tournament.currentRound);
-
-        // Fill in each round's matches
-        for (uint256 r = 1; r <= tournament.totalRounds; r++) {
-            // Only include rounds that have actually started
-            if (r <= tournament.currentRound) {
-                uint256 roundMatches = tournament.matchCount[r];
-                matches[r - 1] = new MatchInfo[](roundMatches);
-
-                for (uint256 i = 0; i < roundMatches; i++) {
-                    uint256 matchId = (r * 1000) + i;
-                    address matchAddress = tournament.matchContracts[matchId];
-
-                    if (matchAddress != address(0)) {
-                        MatchContract matchContract = MatchContract(
-                            matchAddress
-                        );
-                        (address player1, address player2) = matchContract
-                            .getPlayers();
-
-                        matches[r - 1][i] = MatchInfo({
-                            matchAddress: matchAddress,
-                            player1: player1,
-                            player2: player2,
-                            winner: tournament.matchWinners[matchId],
-                            roundNumber: r,
-                            matchIndex: i,
-                            status: matchContract.getMatchStatus()
-                        });
-                    }
-                }
-            }
-        }
-
-        return (tournament.totalRounds, tournament.currentRound, matches);
     }
 }
