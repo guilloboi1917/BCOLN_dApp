@@ -321,8 +321,12 @@ export default function TournamentDetailsPage() {
       // Determine if current user is the winner
       const didIWin = address.toLowerCase() === winner.toLowerCase();
 
+      const commitment = ethers.solidityPackedKeccak256(
+        ["string", "bytes32"],
+        ["I_report_truth", salt]
+      );
       // Submit result with stake
-      const tx = await matchContract.commitAndRevealResult(salt, didIWin, {
+      const tx = await matchContract.commitAndRevealResult(commitment, didIWin, {
         value: stakeAmount,
       });
 
