@@ -19,7 +19,6 @@ import { toast } from "sonner";
 import { Trophy, Calendar, AlertCircle, Clock, ArrowRight } from "lucide-react";
 import { MatchReportDialog } from "@/components/match-report-dialog";
 
-
 export default function DashboardPage() {
   const { connected, address, balance } = useWeb3();
   const [isLoading, setIsLoading] = useState(true);
@@ -129,7 +128,7 @@ export default function DashboardPage() {
             player2: "0x9876...5432",
             scheduledTime: "March 20, 2025, 3:00 PM",
             status: "completed",
-            needsReport: true
+            needsReport: true,
           },
           {
             id: "m4",
@@ -140,7 +139,7 @@ export default function DashboardPage() {
             player2: "0x4567...8901",
             scheduledTime: "March 27, 2025, 4:00 PM",
             status: "completed",
-            result: "win"
+            result: "win",
           },
         ]);
       } catch (error) {
@@ -190,7 +189,6 @@ export default function DashboardPage() {
     setSelectedMatch(match);
     setMatchReportOpen(true);
   };
-
 
   const hasParticipatingTournaments = userTournaments.participating.length > 0;
   const hasCreatedTournaments = userTournaments.created.length > 0;
@@ -255,7 +253,9 @@ export default function DashboardPage() {
                     <CardContent className="p-6">
                       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
-                          <h3 className="font-medium">{match.tournamentName}</h3>
+                          <h3 className="font-medium">
+                            {match.tournamentName}
+                          </h3>
                           <div className="flex items-center gap-2 mt-1">
                             <Badge variant="outline">Round {match.round}</Badge>
                             <div className="text-sm text-muted-foreground flex items-center gap-1">
@@ -299,7 +299,9 @@ export default function DashboardPage() {
                     <CardContent className="p-6">
                       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
-                          <h3 className="font-medium">{match.tournamentName}</h3>
+                          <h3 className="font-medium">
+                            {match.tournamentName}
+                          </h3>
                           <div className="flex items-center gap-2 mt-1">
                             <Badge variant="outline">Round {match.round}</Badge>
                             <div className="text-sm text-muted-foreground flex items-center gap-1">
@@ -319,8 +321,8 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex flex-col sm:flex-row gap-2">
                           {match.needsReport && (
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               onClick={() => handleReportMatch(match)}
                               className="mb-2 sm:mb-0"
                             >

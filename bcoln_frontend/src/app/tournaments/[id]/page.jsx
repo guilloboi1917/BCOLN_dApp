@@ -24,6 +24,7 @@ import {
   Users,
   AlertCircle,
   CheckCircle2,
+  CodeSquare,
 } from "lucide-react";
 import { ethers } from "ethers";
 import { useRef } from "react";
@@ -276,6 +277,8 @@ export default function TournamentDetailsPage() {
   const joinMatchForUser = async (match) => {
     try {
       setJoiningMatchAddress(match.matchAddress);
+
+      console.log(match.matchAddress);
   
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();

@@ -41,14 +41,14 @@ contract MatchContractFactory {
 
         // Initialize the match with tournament data
         MatchContract(matchAddress).initialize(
-            msg.sender,       // creator
-            player1,          // player1
-            player2,          // player2
-            entryFee,         // entry fee
+            msg.sender, // creator
+            player1, // player1
+            player2, // player2
+            entryFee, // entry fee
             tournamentContract, // tournament contract
-            tournamentId,     // tournament ID
-            roundNumber,      // round number
-            matchIndex        // match index
+            tournamentId, // tournament ID
+            roundNumber, // round number
+            matchIndex // match index
         );
 
         emit MatchCreated(matchAddress, msg.sender);
