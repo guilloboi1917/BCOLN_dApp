@@ -20,6 +20,14 @@ To deploy and run a hardhat script on the local network, use the following comma
 npx hardhat run .\scripts\deployMatchSystem.js --network localhost
 ```
 
+To be able to run a local ipfs node:
+- Download [Kubo](https://docs.ipfs.tech/install/command-line/#install-official-binary-distributions)
+- Update the config file to allow CORS by updating the config with the following HTTP-Headers (just at the top):
+```json
+"HTTPHeaders": { "Access-Control-Allow-Credentials": [ "true" ], "Access-Control-Allow-Headers": [ "Authorization" ], "Access-Control-Allow-Methods": [ "GET", "POST", "PUT", "DELETE", "OPTIONS" ], "Access-Control-Allow-Origin": [ "http://localhost:3000", "http://127.0.0.1:3000" ], "Access-Control-Expose-Headers": [ "Location", "Content-Type" ] }
+```
+- Run the ipfs daemon with the updated config
+
 
 
 **Architecture**

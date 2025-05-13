@@ -48,6 +48,12 @@ contract MatchContract {
         bool isBanned;
     }
 
+    // Could you some hashing
+    struct MatchLog {
+        string ipfsCIDPlayer1;
+        string ipfsCIDPlayer2;
+    }
+
     // Match data
     struct Match {
         address player1;
@@ -85,6 +91,7 @@ contract MatchContract {
 
     // Storage
     Match public currentMatch;
+    MatchLog public matchLog;
     mapping(address => Player) public players;
 
     // Events
@@ -143,6 +150,10 @@ contract MatchContract {
 
         currentMatch.juryPool = new address[](0);
 
+        // Initialize to empty
+        matchLog.ipfsCIDPlayer1 = "";
+        matchLog.ipfsCIDPlayer2 = "";
+
         if (_tournamentContract != address(0)) {
             tournamentContract = _tournamentContract;
             tournamentId = _tournamentId;
@@ -180,6 +191,18 @@ contract MatchContract {
         return currentMatch.juryPool.length;
     }
 
+    function getMatchLog() external view returns (MatchLog memory) {
+        return matchLog;
+    }
+
+    function storeMatchLog(string calldata ipfsCID) external onlyPlayers {
+        msg.sender == currentMatch.player1
+            ? matchLog.ipfsCIDPlayer1 = ipfsCID
+            : matchLog.ipfsCIDPlayer2 = ipfsCID;
+
+        console.log("Match log stored: ", ipfsCID);
+    }
+
     function getMatchDetails()
         external
         view
@@ -192,7 +215,8 @@ contract MatchContract {
             uint256 matchIdx,
             bool player1Joined,
             bool player2Joined,
-            uint256 juryCount
+            uint256 juryCount,
+            MatchLog memory _matchLog
         )
     {
         return (
@@ -204,7 +228,8 @@ contract MatchContract {
             matchIndex,
             currentMatch.player1Joined,
             currentMatch.player2Joined,
-            currentMatch.juryPool.length
+            currentMatch.juryPool.length,
+            matchLog
         );
     }
 
@@ -382,7 +407,6 @@ contract MatchContract {
         }
     }
 
-
     // Combined join jury and vote function
     // Jurors stake and vote in a single transaction
     function joinJuryAndVote(uint256 vote) external payable {
@@ -394,13 +418,13 @@ contract MatchContract {
             "Invalid vote: must be 1 (player1) or 2 (player2)"
         );
         require(
-            msg.sender != currentMatch.player1 && msg.sender != currentMatch.player2,
+            msg.sender != currentMatch.player1 &&
+                msg.sender != currentMatch.player2,
             "Players cannot be jurors"
         );
 
-
         require(!currentMatch.isJuror[msg.sender], "Already a juror");
-        
+
         // Add juror to pool and record vote
         currentMatch.juryPool.push(msg.sender);
         currentMatch.isJuror[msg.sender] = true;
@@ -448,11 +472,11 @@ contract MatchContract {
     function getJurors() external view returns (address[] memory jurors) {
         uint256 juryCount = currentMatch.juryPool.length;
         jurors = new address[](juryCount);
-        
+
         for (uint i = 0; i < juryCount; i++) {
             jurors[i] = currentMatch.juryPool[i];
         }
-        
+
         return jurors;
     }
 
@@ -554,7 +578,7 @@ contract MatchContract {
 
         reputationRegistry.updateReputation(liar, REP_LIED, false);
 
-         // Reward jurors
+        // Reward jurors
         for (uint i = 0; i < currentMatch.juryPool.length; i++) {
             payable(currentMatch.juryPool[i]).transfer(JURY_REWARD); // pay out money for voting
             console.log("Paying juries");
@@ -590,8 +614,6 @@ contract MatchContract {
                     (JURY_REWARD * currentMatch.juryPool.length)
             );
         }
-
-       
 
         console.log("Juries Payed juries");
 

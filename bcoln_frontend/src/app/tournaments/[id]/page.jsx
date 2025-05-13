@@ -39,6 +39,8 @@ import TournamentContractData from "@/../lib/contracts/TournamentContract.json";
 import MatchContractData from "../../../../lib/contracts/MatchContract.json";
 import ReputationRegistryData from "../../../../lib/contracts/ReputationRegistry.json";
 
+import { putJSONToIPFS, getJSONFromIPFS } from "@/lib/ipfs"
+
 
 export default function TournamentDetailsPage() {
   const { id } = useParams();
@@ -81,8 +83,6 @@ export default function TournamentDetailsPage() {
       console.log(_matches);
 
       const groupedMatches = groupMatchesByRound(_matches, totalRounds);
-      
-      console.log("Grouped matches for UI:", groupedMatches);
 
       setTournamentMatches(groupedMatches);
 
@@ -103,8 +103,6 @@ export default function TournamentDetailsPage() {
         totalPrize: ethers.formatEther(totalPrize),
         _matches,
       };
-
-      console.log("LIST", parsedTournament.participantList);
 
       setTournament(parsedTournament);
       lastKnownRound.current = Number(parsedTournament.currentRound);
@@ -230,17 +228,35 @@ export default function TournamentDetailsPage() {
         MatchContractData.abi,
         match.matchAddress
       );
-      
+
+      const matchLogTemplate = {
+        date: new Date().toISOString(),
+        address: match.matchAddress,
+        participants: [match.player1, match.player2],
+        winner: winner
+      }
+
+      try {
+        console.log("Uploading Matchlog to IPFS: ", matchLogTemplate);
+        const CID = await putJSONToIPFS(matchLogTemplate);
+        console.log("CID: ", CID);
+
+        // Also upload to matchcontract
+        const uploadMatchLogTx = await matchContract.storeMatchLog(CID);
+      } catch (error) {
+        console.warn("Unable to post to ipfs: ", error);
+      }
+
       const repRegistryAddress = await matchContract.reputationRegistry();
-      
+
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
-      
+
       const repContract = new ethers.Contract(
         repRegistryAddress,
         ReputationRegistryData.abi,
         signer
-      );      
+      );
 
       // Get required stake amount based on player's reputation
       const stakeAmount = await repContract.getStakeAmount(address);
@@ -333,10 +349,10 @@ export default function TournamentDetailsPage() {
               {tournament.status === "open"
                 ? "Open"
                 : tournament.status === "upcoming"
-                ? "Upcoming"
-                : tournament.status === "active"
-                ? "Active"
-                : "Completed"}
+                  ? "Upcoming"
+                  : tournament.status === "active"
+                    ? "Active"
+                    : "Completed"}
             </Badge>
 
             <Badge variant="outline" className="flex items-center gap-1">
@@ -431,7 +447,7 @@ export default function TournamentDetailsPage() {
                 <span className="text-sm">Registration</span>
                 <Badge variant="default">
                   {tournament.status === "open" &&
-                  tournament.registeredParticipants < tournament.maxParticipants
+                    tournament.registeredParticipants < tournament.maxParticipants
                     ? "Open"
                     : "Closed"}
                 </Badge>

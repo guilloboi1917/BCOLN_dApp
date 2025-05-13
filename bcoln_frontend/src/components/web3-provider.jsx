@@ -18,13 +18,13 @@ const Web3Context = createContext({
   balance: "0",
   provider: null,
   network: null,
-  connect: async () => {},
-  disconnect: () => {},
-  joinTournament: async () => {},
-  createTournament: async () => {},
+  connect: async () => { },
+  disconnect: () => { },
+  joinTournament: async () => { },
+  createTournament: async () => { },
   signMessage: async () => "",
-  getMatchDetails: async (address) => {},
-  joinJuryAndVote: async (address, vote) => {},
+  getMatchDetails: async (address) => { },
+  joinJuryAndVote: async (address, vote) => { },
 });
 
 export const useWeb3 = () => useContext(Web3Context);
@@ -184,7 +184,7 @@ export function Web3Provider({ children }) {
     if (!connected) throw new Error("Wallet not connected");
 
     try {
-    } catch (error) {}
+    } catch (error) { }
   };
 
   const getMatchDetails = async (address) => {
@@ -195,8 +195,13 @@ export function Web3Provider({ children }) {
       const matchContract = await getContract(MatchContractData.abi, address);
 
       const matchDetails = await matchContract.getMatchDetails();
+      const matchLogs = await matchContract.getMatchLog();
 
-      return matchDetails;
+      return {
+        ...matchDetails,
+        p1IPFSCID: matchLogs[0],
+        p2IPFSCID: matchLogs[1],
+      };
     } catch (error) {
       console.error(
         "Couldn't fetch match details for: ",

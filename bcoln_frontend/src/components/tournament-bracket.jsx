@@ -8,7 +8,6 @@ export function TournamentBracket({ tournament }) {
 
   useEffect(() => {
     const matchesNested = tournament.matches;
-    console.log("matches", matchesNested)
     if (!matchesNested) return;
 
     const groupedRounds = matchesNested.map((matches, index) => {
