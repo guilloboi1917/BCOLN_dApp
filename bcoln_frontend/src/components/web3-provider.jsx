@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ethers, parseEther, formatEther } from "ethers";
 import { getContract } from "@/lib/contracts";
 import { clearAllSubmissionsForAddress } from "@/lib/submissions";
+import { clearMatchHistory } from "@/lib/match-history";
 
 import TournamentContractData from "../../lib/contracts/TournamentContract.json";
 import MatchContractData from "../../lib/contracts/MatchContract.json";
@@ -37,6 +38,17 @@ export function Web3Provider({ children }) {
   const [provider, setProvider] = useState(null);
   const [network, setNetwork] = useState(null);
 
+  useEffect(() => {
+    const updateBalance = async () => {
+      if (connected && address) {
+        const ethBalance = await fetchBalance(address);
+        setBalance(parseFloat(ethBalance).toFixed(4));
+      }
+    };
+  
+    updateBalance();
+  }, [connected, address]);
+  
   const EXPECTED_CHAIN_ID = 31337n;
 
   const connect = async () => {
@@ -79,12 +91,12 @@ export function Web3Provider({ children }) {
 
       const accounts = await ethProvider.send("eth_requestAccounts", []);
       const userAddress = accounts[0];
-      const balanceInWei = await ethProvider.getBalance(userAddress);
-      const ethBalance = formatEther(balanceInWei);
+
+      const ethBalance = await fetchBalance(userAddress);
+      setBalance(parseFloat(ethBalance).toFixed(4));
 
       console.log("ETH Balance:", ethBalance);
-      console.log("Wei Balance:", balanceInWei.toString());
-
+        
       setAddress(userAddress);
       setBalance(parseFloat(ethBalance).toFixed(4));
       setProvider(ethProvider);
@@ -105,6 +117,7 @@ export function Web3Provider({ children }) {
   const disconnect = () => {
     if (address) {
       clearAllSubmissionsForAddress(address);
+      clearMatchHistory();
     }
     setAddress(null);
     setBalance("0");
@@ -118,6 +131,14 @@ export function Web3Provider({ children }) {
       description: "Your wallet has been disconnected",
     });
   };
+
+  const fetchBalance = async (userAddress) => {
+    if (!userAddress || !window.ethereum) return "0.0";
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const balanceWei = await provider.getBalance(userAddress);
+    return ethers.formatEther(balanceWei);
+  };
+  
 
   // Mock joining a tournament
   const joinTournament = async (tournamentId, entryFee) => {
