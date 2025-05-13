@@ -135,7 +135,7 @@ export function MatchCard({
           {statusString === "dispute" && (
             <Button
               size="sm"
-              variant="outline"
+              variant="default"
               onClick={() =>
                 toast.info("Jury functionality coming soon")
               }

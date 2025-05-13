@@ -330,10 +330,13 @@ export default function TournamentDetailsPage() {
           <h1 className="text-3xl font-bold">{tournament.title}</h1>
           <div className="flex flex-wrap gap-2 mt-2">
             <Badge variant="default">
-              {tournament.status === "open" &&
-              tournament.registeredParticipants < tournament.maxParticipants
-                ? "Open for Entry"
-                : "Active"}
+              {tournament.status === "open"
+                ? "Open"
+                : tournament.status === "upcoming"
+                ? "Upcoming"
+                : tournament.status === "active"
+                ? "Active"
+                : "Completed"}
             </Badge>
 
             <Badge variant="outline" className="flex items-center gap-1">
@@ -357,7 +360,7 @@ export default function TournamentDetailsPage() {
           <Button onClick={handleJoinTournament} disabled={isJoinDisabled}>
             {isJoining
               ? "Joining..."
-              : `Join Tournament (${tournament.entryFee})`}
+              : "Join Tournament"}
           </Button>
 
           <Button variant="outline" asChild>
