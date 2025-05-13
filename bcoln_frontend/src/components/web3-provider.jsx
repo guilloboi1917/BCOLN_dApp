@@ -1,39 +1,48 @@
-﻿"use client"
+﻿"use client";
 
-import { createContext, useContext, useState, useEffect } from "react"
-import { toast } from "sonner"
+import { createContext, useContext, useState, useEffect } from "react";
+import { toast } from "sonner";
 import { ethers, parseEther, formatEther } from "ethers";
 import { getContract } from "@/lib/contracts";
 import { clearAllSubmissionsForAddress } from "@/lib/submissions";
 
-import TournamentContractData from '../../lib/contracts/TournamentContract.json'; 
+import TournamentContractData from "../../lib/contracts/TournamentContract.json";
+import MatchContractData from "../../lib/contracts/MatchContract.json";
+import { add } from "date-fns";
 
 // Create a context for Web3 functionality
 const Web3Context = createContext({
   connected: false,
+  connecting: false,
   address: null,
   balance: "0",
+  provider: null,
+  network: null,
   connect: async () => {},
   disconnect: () => {},
   joinTournament: async () => {},
   createTournament: async () => {},
   signMessage: async () => "",
-})
+  getMatchDetails: async (address) => {},
+  joinJuryAndVote: async (address, vote) => {},
+});
 
-export const useWeb3 = () => useContext(Web3Context)
+export const useWeb3 = () => useContext(Web3Context);
 
 export function Web3Provider({ children }) {
-  const [connecting, setConnecting] = useState(false); 
-  const [connected, setConnected] = useState(false)
-  const [address, setAddress] = useState(null)
-  const [balance, setBalance] = useState("0")
+  const [connecting, setConnecting] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [address, setAddress] = useState(null);
+  const [balance, setBalance] = useState("0");
+  const [provider, setProvider] = useState(null);
+  const [network, setNetwork] = useState(null);
 
   const EXPECTED_CHAIN_ID = 31337n;
 
   const connect = async () => {
-    if (connecting) return; 
+    if (connecting) return;
     setConnecting(true);
-    
+
     try {
       if (!window.ethereum) {
         toast.error("MetaMask not detected", {
@@ -47,7 +56,6 @@ export function Web3Provider({ children }) {
       //   params: [{ eth_accounts: {} }],
       // });
 
-        
       const ethProvider = new ethers.BrowserProvider(window.ethereum);
       const network = await ethProvider.getNetwork();
       console.log("Connected to network:", network);
@@ -73,13 +81,16 @@ export function Web3Provider({ children }) {
       const userAddress = accounts[0];
       const balanceInWei = await ethProvider.getBalance(userAddress);
       const ethBalance = formatEther(balanceInWei);
+
       console.log("ETH Balance:", ethBalance);
       console.log("Wei Balance:", balanceInWei.toString());
-  
+
       setAddress(userAddress);
       setBalance(parseFloat(ethBalance).toFixed(4));
+      setProvider(ethProvider);
+      setNetwork(network);
       setConnected(true);
-  
+
       toast.success("Wallet connected", {
         description: "Your wallet has been successfully connected",
       });
@@ -99,12 +110,14 @@ export function Web3Provider({ children }) {
     setBalance("0");
     setConnected(false);
     setConnecting(false);
+    setProvider(null);
+    setNetwork(null);
     localStorage.removeItem("walletConnected");
-  
+
     toast.info("Wallet disconnected", {
       description: "Your wallet has been disconnected",
     });
-  };  
+  };
 
   // Mock joining a tournament
   const joinTournament = async (tournamentId, entryFee) => {
@@ -124,63 +137,100 @@ export function Web3Provider({ children }) {
 
     const newBalance = await signer.getBalance();
     setBalance(formatEther(newBalance));
-  }
+  };
 
   // Mock creating a tournament
   const createTournament = async (tournamentData) => {
-    if (!connected) throw new Error("Wallet not connected")
+    if (!connected) throw new Error("Wallet not connected");
 
-      const contract = await getContract(
-        TournamentContractData.abi,
-        TournamentContractData.address
+    const contract = await getContract(
+      TournamentContractData.abi,
+      TournamentContractData.address
+    );
+
+    try {
+      // Call the smart contract to create a tournament
+      console.log("Submitting tournament:", tournamentData);
+      const tx = await contract.createTournament(
+        tournamentData.title,
+        tournamentData.description,
+        parseEther(tournamentData.entryFee.toString()), // Convert to Wei
+        // ethers.utils.parseEther(tournamentData.prize.toString()), // Convert to Wei
+        tournamentData.maxParticipants,
+        Math.floor(tournamentData.startDate.getTime() / 1000) // Convert to Unix timestamp
       );
-    
-      try {
-        // Call the smart contract to create a tournament
-        console.log("Submitting tournament:", tournamentData);
-        const tx = await contract.createTournament(
-          tournamentData.title,
-          tournamentData.description,
-          parseEther(tournamentData.entryFee.toString()), // Convert to Wei
-          // ethers.utils.parseEther(tournamentData.prize.toString()), // Convert to Wei
-          tournamentData.maxParticipants,
-          Math.floor(tournamentData.startDate.getTime() / 1000) // Convert to Unix timestamp
-        );
-        console.log("Transaction submitted:", tx.hash);
-    
-        // Wait for transaction to be mined
-        await tx.wait();
-        console.log("Transaction confirmed");
-    
-        toast.success("Tournament created successfully!", {
-          description: "Your tournament has been created on the blockchain.",
-        });
+      console.log("Transaction submitted:", tx.hash);
 
-        const count = await contract.getAllTournaments()
-        console.log("TOURNAMEN COUNT", count)
-      } catch (error) {
-        console.error("Error creating tournament:", error);
-        toast.error("Failed to create tournament", {
-          description: "There was an error creating your tournament. Please try again.",
-        });
-      }
-  }
+      // Wait for transaction to be mined
+      await tx.wait();
+      console.log("Transaction confirmed");
 
-  const getTournamentInformation = async(id) => {
+      toast.success("Tournament created successfully!", {
+        description: "Your tournament has been created on the blockchain.",
+      });
+
+      const count = await contract.getAllTournaments();
+      console.log("TOURNAMEN COUNT", count);
+    } catch (error) {
+      console.error("Error creating tournament:", error);
+      toast.error("Failed to create tournament", {
+        description:
+          "There was an error creating your tournament. Please try again.",
+      });
+    }
+  };
+
+  const getTournamentInformation = async (id) => {
     if (!connected) throw new Error("Wallet not connected");
 
     try {
+    } catch (error) {}
+  };
 
-      
+  const getMatchDetails = async (address) => {
+    if (!connected) throw new Error("Wallet not connected");
+
+    try {
+      console.log("Fetching match details");
+      const matchContract = await getContract(MatchContractData.abi, address);
+
+      const matchDetails = await matchContract.getMatchDetails();
+
+      return matchDetails;
     } catch (error) {
-      
-    }
+      console.error(
+        "Couldn't fetch match details for: ",
+        address,
+        "Reason: ",
+        error
+      );
 
-  }
+      return null;
+    }
+  };
+
+  const joinJuryAndVote = async (address, vote) => {
+    if (!connected) throw new Error("Wallet not connected");
+
+    const JURY_STAKE = "0.1";
+    const JURY_STAKE_amountInWei = ethers.parseEther(JURY_STAKE);
+
+    console.log(JURY_STAKE_amountInWei);
+
+    try {
+      const matchContract = await getContract(MatchContractData.abi, address);
+      const voteTx = await matchContract.joinJuryAndVote(vote, {
+        value: JURY_STAKE_amountInWei,
+      });
+    } catch (err) {
+      console.warn("Sign error:", err);
+      throw err;
+    }
+  };
 
   const signMessage = async (message) => {
     if (!connected) throw new Error("Wallet not connected");
-  
+
     try {
       const ethProvider = new ethers.BrowserProvider(window.ethereum);
       const signer = await ethProvider.getSigner();
@@ -194,7 +244,7 @@ export function Web3Provider({ children }) {
 
   useEffect(() => {
     const wasConnected = localStorage.getItem("walletConnected") === "true";
-  
+
     if (wasConnected) {
       setConnected(true);
     }
@@ -234,16 +284,20 @@ export function Web3Provider({ children }) {
         connecting,
         address,
         balance,
+        provider,
+        network,
         connect,
         disconnect,
         joinTournament,
         createTournament,
         signMessage,
+        getMatchDetails,
+        joinJuryAndVote,
       }}
     >
       {children}
     </Web3Context.Provider>
-  )
+  );
 }
 
-export { Web3Context }
+export { Web3Context };
