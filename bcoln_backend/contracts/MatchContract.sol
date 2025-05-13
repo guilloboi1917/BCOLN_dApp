@@ -14,6 +14,10 @@ interface ITournament {
     ) external;
 }
 
+interface IFactory {
+    function emitDispute(address matchContract) external;
+}
+
 contract MatchContract {
     // To follow EIP-1167 pattern we require the following addresses
     address public immutable factory; // address of the factory taking care of contract creation
@@ -86,7 +90,6 @@ contract MatchContract {
     event MatchCreated(address player1, address player2);
     event ResultCommitted(address player);
     event ResultRevealed(address player, string result);
-    event DisputeInitiated();
     event JuryVoted(address indexed juror, uint256 vote);
     event MatchResolved(address indexed winner);
     event PlayerJoined(address indexed player);
@@ -305,7 +308,7 @@ contract MatchContract {
                 else _resolveMatch(currentMatch.player1);
             } else {
                 status = MatchStatus.Dispute;
-                emit DisputeInitiated();
+                IFactory(factory).emitDispute(address(this));
             }
         }
     }
@@ -365,7 +368,7 @@ contract MatchContract {
             } else {
                 // Players disagree, initiate dispute
                 status = MatchStatus.Dispute;
-                emit DisputeInitiated();
+                IFactory(factory).emitDispute(address(this));
             }
         }
     }
@@ -423,6 +426,9 @@ contract MatchContract {
             vote == 1 || vote == 2,
             "Invalid vote: must be 1 (player1) or 2 (player2)"
         );
+
+        console.log(msg.sender, " VOTED");
+        console.log("VOTE: ", vote);
 
         // Check if juror has already joined
         for (uint i = 0; i < currentMatch.juryPool.length; i++) {

@@ -41,6 +41,11 @@ export function Navbar() {
       label: "My Dashboard",
       active: pathname === "/dashboard",
     },
+    {
+      href: "/jurypage",
+      label: "Jury Page",
+      active: pathname === "/jurypage",
+    },
   ];
 
   return (

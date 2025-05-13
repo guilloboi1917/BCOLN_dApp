@@ -14,6 +14,19 @@
           "internalType": "address",
           "name": "matchAddress",
           "type": "address"
+        }
+      ],
+      "name": "DisputeInitiated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "matchAddress",
+          "type": "address"
         },
         {
           "indexed": true,
@@ -100,6 +113,19 @@
           "type": "address"
         }
       ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "matchAddress",
+          "type": "address"
+        }
+      ],
+      "name": "emitDispute",
+      "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     },

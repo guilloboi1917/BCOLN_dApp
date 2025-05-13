@@ -14,6 +14,12 @@ contract MatchContractFactory {
     ReputationRegistry public immutable reputationRegistry;
 
     event MatchCreated(address indexed matchAddress, address indexed creator);
+    event DisputeInitiated(address indexed matchAddress);
+
+    // Emit event at globally accessible address
+    function emitDispute(address matchAddress) external {
+        emit DisputeInitiated(matchAddress);
+    }
 
     constructor() {
         // Single reputationRegistry per MatchContractFactory
