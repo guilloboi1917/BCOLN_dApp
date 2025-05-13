@@ -593,19 +593,17 @@ contract MatchContract {
         // Report result to tournament if this is a tournament match
         if (isTournamentMatch) {
             // Call the tournament contract to report the match result
-            (bool success, ) = tournamentContract.call(
-                abi.encodeWithSignature(
-                    "reportMatchResult(uint256,uint256,uint256,address)",
-                    tournamentId,
-                    roundNumber,
-                    matchIndex,
-                    winner
-                )
+            TournamentContract tournament = TournamentContract(
+                payable(address(tournamentContract))
             );
-            // If reporting to tournament fails, we still want to pay the winner
-            if (!success) {
-                console.log("Failed to report match to tournament");
-            }
+
+            // try
+            tournament.reportMatchResult(
+                tournamentId,
+                roundNumber,
+                matchIndex,
+                winner
+            );
         } else {
             // Payout for winners in a direct match
             payable(winner).transfer(

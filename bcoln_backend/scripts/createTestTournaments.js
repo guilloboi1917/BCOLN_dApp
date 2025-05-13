@@ -1,5 +1,5 @@
 // scripts/test-tournament-system.js
-const { ethers } = require("hardhat");
+const { ethers, parseEther } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
 const exportFrontendArtifacts = require("./exportFrontendArtifacts");
 
@@ -242,9 +242,13 @@ async function main() {
         // Players commit their results
         console.log("Player3 committing and revealing result...");
         await match2.connect(player3).commitAndRevealResult(player3Commitment, true, { value: p3StakeMultiplier });
+        await match2.connect(player4).commitAndRevealResult(player4Commitment, true, { value: p4StakeMultiplier });
+
+        await match2.connect(player1).joinJuryAndVote(1, { value: ethers.parseEther("0.1") });
+        await match2.connect(player5).joinJuryAndVote(1, { value: ethers.parseEther("0.1") });
 
         // await match2.connect(player3).storeMatchLog("TestCID1");
-        
+
         // BOTH REPORT TRUE
         // console.log("Player4 committing and revealing result...");
         // await match2.connect(player4).commitAndRevealResult(player4Commitment, true, { value: p4StakeMultiplier });
@@ -263,8 +267,8 @@ async function main() {
         // await match2.connect(player4).commitAndRevealResult(player4Commitment, false, { value: p4StakeMultiplier });
 
 
-    //   const matches = await tournamentContract.getAllTournamentMatches(0);
-    //     console.log(matches);
+        //   const matches = await tournamentContract.getAllTournamentMatches(0);
+        //     console.log(matches);
         // We don't report match result for player 4
     } else {
         console.log("Error: Match 2 not found");
