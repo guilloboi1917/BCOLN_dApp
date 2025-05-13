@@ -64,6 +64,7 @@ contract MatchContract {
         uint256 entryFee;
         address[] juryPool;
         mapping(address => uint256) juryVotes;
+        mapping(address => bool) isJuror;
         uint256 revealDeadline;
     }
 
@@ -213,6 +214,14 @@ contract MatchContract {
         returns (bool player1Joined, bool player2Joined)
     {
         return (currentMatch.player1Joined, currentMatch.player2Joined);
+    }
+
+    function isJuror(address jurorAddress) external view returns (bool) {
+        return currentMatch.isJuror[jurorAddress];
+    }
+
+    function hasJurorVoted(address jurorAddress) external view returns (bool) {
+        return currentMatch.juryVotes[jurorAddress] > 0;
     }
 
     function joinMatch() external payable onlyPlayers {
@@ -373,48 +382,6 @@ contract MatchContract {
         }
     }
 
-    // Jury system
-    function joinJury() external payable {
-        require(!reputationRegistry.isBanned(msg.sender), "You are banned");
-        require(msg.value == JURY_STAKE, "Incorrect jury stake");
-
-        require(status == MatchStatus.Dispute, "No active dispute");
-        currentMatch.juryPool.push(msg.sender);
-    }
-
-    function voteAsJuror(uint256 vote) external {
-        require(status == MatchStatus.Dispute, "No active dispute");
-
-        bool isJuror = false;
-        for (uint i = 0; i < currentMatch.juryPool.length; i++) {
-            if (currentMatch.juryPool[i] == msg.sender) {
-                isJuror = true;
-                break;
-            }
-        }
-        require(isJuror, "Not a juror");
-
-        currentMatch.juryVotes[msg.sender] = vote;
-        emit JuryVoted(msg.sender, vote);
-
-        // Tally votes if all jurors voted
-        if (currentMatch.juryPool.length >= 3) {
-            // Minimum 3 jurors
-            uint256 player1Votes;
-            uint256 player2Votes;
-
-            for (uint i = 0; i < currentMatch.juryPool.length; i++) {
-                if (currentMatch.juryVotes[currentMatch.juryPool[i]] == 1)
-                    player1Votes++;
-                else player2Votes++;
-            }
-
-            address winner = player1Votes > player2Votes
-                ? currentMatch.player1
-                : currentMatch.player2;
-            _resolveDispute(winner);
-        }
-    }
 
     // Combined join jury and vote function
     // Jurors stake and vote in a single transaction
@@ -426,18 +393,20 @@ contract MatchContract {
             vote == 1 || vote == 2,
             "Invalid vote: must be 1 (player1) or 2 (player2)"
         );
+        require(
+            msg.sender != currentMatch.player1 && msg.sender != currentMatch.player2,
+            "Players cannot be jurors"
+        );
 
-        console.log(msg.sender, " VOTED");
-        console.log("VOTE: ", vote);
 
-        // Check if juror has already joined
-        for (uint i = 0; i < currentMatch.juryPool.length; i++) {
-            require(currentMatch.juryPool[i] != msg.sender, "Already a juror");
-        }
-
+        require(!currentMatch.isJuror[msg.sender], "Already a juror");
+        
         // Add juror to pool and record vote
         currentMatch.juryPool.push(msg.sender);
+        currentMatch.isJuror[msg.sender] = true;
         currentMatch.juryVotes[msg.sender] = vote;
+
+        console.log(msg.sender, "voted as jury");
 
         emit JuryVoted(msg.sender, vote);
 
@@ -470,7 +439,21 @@ contract MatchContract {
             winner = currentMatch.player1;
         }
 
+        console.log("Jury decided about the winner");
+
         _resolveDispute(winner);
+    }
+
+    // Get all jurors with their vote status
+    function getJurors() external view returns (address[] memory jurors) {
+        uint256 juryCount = currentMatch.juryPool.length;
+        jurors = new address[](juryCount);
+        
+        for (uint i = 0; i < juryCount; i++) {
+            jurors[i] = currentMatch.juryPool[i];
+        }
+        
+        return jurors;
     }
 
     // Internal resolution functions
@@ -571,6 +554,18 @@ contract MatchContract {
 
         reputationRegistry.updateReputation(liar, REP_LIED, false);
 
+         // Reward jurors
+        for (uint i = 0; i < currentMatch.juryPool.length; i++) {
+            payable(currentMatch.juryPool[i]).transfer(JURY_REWARD); // pay out money for voting
+            console.log("Paying juries");
+            // update reputation
+            reputationRegistry.updateReputation(
+                currentMatch.juryPool[i],
+                REP_JURY_VOTE,
+                false
+            );
+        }
+
         // Report result to tournament if this is a tournament match
         if (isTournamentMatch) {
             // Call the tournament contract to report the match result
@@ -596,17 +591,9 @@ contract MatchContract {
             );
         }
 
-        // Reward jurors
-        for (uint i = 0; i < currentMatch.juryPool.length; i++) {
-            payable(currentMatch.juryPool[i]).transfer(JURY_REWARD); // pay out money for voting
+       
 
-            // update reputation
-            reputationRegistry.updateReputation(
-                currentMatch.juryPool[i],
-                REP_JURY_VOTE,
-                false
-            );
-        }
+        console.log("Juries Payed juries");
 
         emit MatchResolved(winner);
     }
