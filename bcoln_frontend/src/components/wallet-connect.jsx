@@ -89,7 +89,14 @@ export function WalletConnect({ className }) {
   }
 
   return (
-    <Button onClick={connect} disabled={connecting} className={cn("gap-2", className)}>
+    <Button
+      variant="outline"
+      onClick={() => {
+        if (!connecting) connect();
+      }}
+      disabled={connecting}
+      className={cn("gap-2", className)}
+    >
       <Wallet className="h-4 w-4" />
       <span>{connecting ? "Connecting..." : "Connect Wallet"}</span>
     </Button>

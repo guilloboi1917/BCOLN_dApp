@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "./ReputationRegistry.sol";
 import "./MatchContract.sol";
+import "hardhat/console.sol";
 
 contract MatchContractFactory {
     // We follow EIB-1167 to reduce gas costs
@@ -38,17 +39,18 @@ contract MatchContractFactory {
         matches.push(matchAddress);
 
         console.log("Tournament match created at: ", matchAddress);
+        console.log("Tournament match created for round: ", roundNumber);
 
         // Initialize the match with tournament data
         MatchContract(matchAddress).initialize(
-            msg.sender,       // creator
-            player1,          // player1
-            player2,          // player2
-            entryFee,         // entry fee
+            msg.sender, // creator
+            player1, // player1
+            player2, // player2
+            entryFee, // entry fee
             tournamentContract, // tournament contract
-            tournamentId,     // tournament ID
-            roundNumber,      // round number
-            matchIndex        // match index
+            tournamentId, // tournament ID
+            roundNumber, // round number
+            matchIndex // match index
         );
 
         emit MatchCreated(matchAddress, msg.sender);

@@ -2,6 +2,13 @@ require("@nomicfoundation/hardhat-toolbox");
 require("@nomicfoundation/hardhat-ignition-ethers");
 
 
+// Custom task to reset the local Hardhat node
+task("reset-node", "Resets the local Hardhat node", async () => {
+  const { ethers } = require("hardhat");
+  await ethers.provider.send("hardhat_reset", []);
+  console.log("Local node reset.");
+});
+
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
@@ -15,9 +22,11 @@ module.exports = {
     }
   },
   networks: {
-    hardhat: {
-      chainId: 31337
-    },
+    // hardhat: {
+    //   chainId: 31337,
+    //   allowUnlimitedContractSize: true,
+    //   blockGasLimit: 10000000
+    // },
     localhost: {
       url: "http://127.0.0.1:8545",
       chainId: 31337

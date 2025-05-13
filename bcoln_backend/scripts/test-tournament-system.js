@@ -255,7 +255,7 @@ async function main() {
   
   // Check the winners of round 1
   console.log("\n11. Round 1 completed. Checking winners...");
-  await new Promise(resolve => setTimeout(resolve, 10000)); // Give time for transactions to be mined
+  await new Promise(resolve => setTimeout(resolve, 2000)); // Give time for transactions to be mined
   
   const roundWinners = await tournamentContract.getRoundWinners(0, 1);
   console.log("Round 1 winners:", roundWinners);

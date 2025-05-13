@@ -1,30 +1,38 @@
-﻿"use client"
+﻿"use client";
 
-import { useEffect, useState } from "react"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { TournamentCard } from "@/components/tournament-card"
-import { Search, Filter } from "lucide-react"
-import { ethers } from "ethers"
+import { useEffect, useState } from "react";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { TournamentCard } from "@/components/tournament-card";
+import { Search, Filter } from "lucide-react";
+import { ethers } from "ethers";
+import { mapStatus } from "@/lib/status";
+import { getContract } from "@/lib/contracts";
 
-import TournamentContractData from '../../../lib/contracts/TournamentContract.json'; 
+
+import TournamentContractData from "../../../lib/contracts/TournamentContract.json";
 
 export default function TournamentsPage() {
-  const [tournaments, setTournaments] = useState([])
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
+  const [tournaments, setTournaments] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     const fetchTournaments = async () => {
       try {
-        const provider = new ethers.BrowserProvider(window.ethereum)
-        const contract = new ethers.Contract(
-          TournamentContractData.address,
+        console.log(TournamentContractData)
+        const contract = await getContract(
           TournamentContractData.abi,
-          await provider.getSigner()
-        )
-
-        const data = await contract.getAllTournaments()
+          TournamentContractData.address
+        );
+        const data = await contract.getAllTournaments();
+        console.log("Fetched tournament data: ", data);
         const parsed = data.map((t) => ({
           id: t.id.toString(),
           title: t.name,
@@ -34,27 +42,25 @@ export default function TournamentsPage() {
           participants: t.maxParticipants,
           startDate: new Date(Number(t.startTime) * 1000).toLocaleDateString(),
           status: mapStatus(t.status),
-        }))
-        console.log("Tournaments", parsed)
-        setTournaments(parsed)
+        }));
+        console.log("Tournaments", parsed);
+        setTournaments(parsed);
       } catch (err) {
-        console.error("Failed to fetch tournaments", err)
+        console.error("Failed to fetch tournaments", err);
       }
-    }
+    };
 
-    fetchTournaments()
-  }, [])
-
-  const mapStatus = (statusId) => {
-    return ["open", "active", "completed", "cancelled"][statusId] || "unknown"
-  }
-
+    fetchTournaments();
+  }, []);
 
   const filteredTournaments = tournaments.filter((tournament) => {
-    const matchesSearch = tournament.title.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || tournament.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+    const matchesSearch = tournament.title
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" || tournament.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -96,10 +102,11 @@ export default function TournamentsPage() {
       ) : (
         <div className="text-center py-12">
           <h3 className="text-xl font-medium">No tournaments found</h3>
-          <p className="text-muted-foreground mt-2">Try adjusting your search or filters</p>
+          <p className="text-muted-foreground mt-2">
+            Try adjusting your search or filters
+          </p>
         </div>
       )}
     </div>
-  )
+  );
 }
-

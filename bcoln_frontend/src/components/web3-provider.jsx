@@ -3,6 +3,8 @@
 import { createContext, useContext, useState, useEffect } from "react"
 import { toast } from "sonner"
 import { ethers, parseEther, formatEther } from "ethers";
+import { getContract } from "@/lib/contracts";
+import { clearAllSubmissionsForAddress } from "@/lib/submissions";
 
 import TournamentContractData from '../../lib/contracts/TournamentContract.json'; 
 
@@ -90,15 +92,19 @@ export function Web3Provider({ children }) {
   };
 
   const disconnect = () => {
+    if (address) {
+      clearAllSubmissionsForAddress(address);
+    }
     setAddress(null);
     setBalance("0");
     setConnected(false);
+    setConnecting(false);
     localStorage.removeItem("walletConnected");
-
+  
     toast.info("Wallet disconnected", {
       description: "Your wallet has been disconnected",
     });
-  };
+  };  
 
   // Mock joining a tournament
   const joinTournament = async (tournamentId, entryFee) => {
@@ -124,12 +130,10 @@ export function Web3Provider({ children }) {
   const createTournament = async (tournamentData) => {
     if (!connected) throw new Error("Wallet not connected")
 
-      const contractAddress = TournamentContractData.address
-      const contractABI = TournamentContractData.abi
-
-      const ethProvider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await ethProvider.getSigner();
-      const contract = new ethers.Contract(contractAddress, contractABI, signer);
+      const contract = await getContract(
+        TournamentContractData.abi,
+        TournamentContractData.address
+      );
     
       try {
         // Call the smart contract to create a tournament
@@ -160,6 +164,18 @@ export function Web3Provider({ children }) {
           description: "There was an error creating your tournament. Please try again.",
         });
       }
+  }
+
+  const getTournamentInformation = async(id) => {
+    if (!connected) throw new Error("Wallet not connected");
+
+    try {
+
+      
+    } catch (error) {
+      
+    }
+
   }
 
   const signMessage = async (message) => {

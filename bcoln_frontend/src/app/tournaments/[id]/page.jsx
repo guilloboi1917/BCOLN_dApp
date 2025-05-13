@@ -16,97 +16,113 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TournamentBracket } from "@/components/tournament-bracket";
 import { ParticipantsList } from "@/components/participants-list";
 import { MatchReportDialog } from "@/components/match-report-dialog";
+import { MatchCard } from "@/components/match-card";
 import { toast } from "sonner";
 import { useWeb3 } from "@/hooks/use-web3";
 import {
   Calendar,
   Trophy,
   Users,
-  Clock,
   AlertCircle,
   CheckCircle2,
+  CodeSquare,
 } from "lucide-react";
 import { ethers } from "ethers";
+import { useRef } from "react";
+import { mapStatus, getMatchDisplayStatus, getStatusString } from "@/lib/status";
+import { getContract, getReadOnlyContract } from "@/lib/contracts";
+import { groupMatchesByRound } from "@/lib/match";
+import { useTournamentPolling } from "@/hooks/use-tournament-polling";
+import { markResultSubmitted } from "@/lib/submissions";
 
-import TournamentContractData from "../../../../lib/contracts/TournamentContract.json";
+import TournamentContractData from "@/../lib/contracts/TournamentContract.json";
+import MatchContractData from "../../../../lib/contracts/MatchContract.json";
+import ReputationRegistryData from "../../../../lib/contracts/ReputationRegistry.json";
+
 
 export default function TournamentDetailsPage() {
   const { id } = useParams();
-  const { connected, address, joinTournament } = useWeb3();
+  const { connected, address } = useWeb3();
   const [isJoining, setIsJoining] = useState(false);
   const [tournament, setTournament] = useState(null);
+  const [tournamentMatches, setTournamentMatches] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState(null);
+  const [joiningMatchAddress, setJoiningMatchAddress] = useState(null);
+  const lastKnownRound = useRef(null);
+
+  const fetchTournament = async () => {
+    setIsLoading(true);
+    try {
+      const contract = await getContract(
+        TournamentContractData.abi,
+        TournamentContractData.address
+      );
+
+      console.log(contract);
+      console.log("ID", id);
+
+      const [
+        name,
+        description,
+        entryFee,
+        maxParticipants,
+        registeredParticipants,
+        startTime,
+        status,
+        currentRound,
+        totalRounds,
+        totalPrize,
+        participants,
+      ] = await contract.getTournamentDetails(id);
+
+      const _matches = await contract.getAllTournamentMatches(id);
+      console.log(_matches);
+
+      const groupedMatches = groupMatchesByRound(_matches, totalRounds);
+      
+      console.log("Grouped matches for UI:", groupedMatches);
+
+      setTournamentMatches(groupedMatches);
+
+      const parsedTournament = {
+        title: name,
+        description,
+        entryFee: ethers.formatEther(entryFee),
+        prize: ethers.formatEther(totalPrize),
+        maxParticipants: Number(maxParticipants),
+        registeredParticipants: Number(registeredParticipants),
+        participantList: Array.from(participants).map((address) => ({
+          address,
+        })),
+        startDate: new Date(Number(startTime) * 1000).toLocaleDateString(),
+        status: mapStatus(status),
+        currentRound,
+        totalRounds,
+        totalPrize: ethers.formatEther(totalPrize),
+        _matches,
+      };
+
+      console.log("LIST", parsedTournament.participantList);
+
+      setTournament(parsedTournament);
+      lastKnownRound.current = Number(parsedTournament.currentRound);
+    } catch (error) {
+      console.error("Error fetching tournament:", error);
+      toast.error("Error loading tournament", {
+        description: "Could not load tournament details. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchTournament = async () => {
-      setIsLoading(true);
-      try {
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const contract = new ethers.Contract(
-          TournamentContractData.address,
-          TournamentContractData.abi,
-          await provider.getSigner()
-        );
-
-        console.log("ID", id);
-
-        const tournamentData = await contract.getTournamentDetails(id);
-        const [totalRounds, currentRound, matches] = await contract.getTournamentBracket(id);
-
-        const parsedTournament = {
-          title: tournamentData.name,
-          description: tournamentData.description,
-          entryFee: ethers.formatEther(tournamentData.entryFee),
-          prize: ethers.formatEther(tournamentData.totalPrize),
-          maxParticipants: tournamentData.maxParticipants,
-          registeredParticipants: tournamentData.registeredParticipants,
-          participantList: tournamentData.participants,
-          startDate: new Date(
-            Number(tournamentData.startTime) * 1000
-          ).toLocaleDateString(),
-          status: mapStatus(tournamentData.status),
-          currentRound: tournamentData.currentRound,
-          totalRounds: tournamentData.totalRounds,
-          totalPrize: ethers.formatEther(tournamentData.totalPrize),
-          matches
-        };
-
-        console.log("LIST", parsedTournament.participantList);
-
-        // const parsedTournament = {
-        //   id: tournamentData.id.toString(),
-        //   title: tournamentData.name,
-        //   description: tournamentData.description,
-        //   entryFee: ethers.formatEther(tournamentData.entryFee),
-        //   prize: ethers.formatEther(tournamentData.totalPrize),
-        //   participants: tournamentData.maxParticipants,
-        //   currentParticipants: tournamentData.currentParticipants.toString(),
-        //   startDate: new Date(Number(tournamentData.startTime) * 1000).toLocaleDateString(),
-        //   status: mapStatus(tournamentData.status),
-        //   participants: tournamentData.participants.map((p) => ({
-        //     address: p.address,
-        //     joinedAt: new Date(Number(p.joinedAt) * 1000).toLocaleDateString(),
-        //   })),
-        //   matches: tournamentData.matches || [],
-        // };
-
-        setTournament(parsedTournament);
-      } catch (error) {
-        console.error("Error fetching tournament:", error);
-        toast.error("Error loading tournament", {
-          description: "Could not load tournament details. Please try again.",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchTournament();
   }, [id]);
 
-  const mapStatus = (statusId) => {
-    return ["open", "active", "completed", "cancelled"][statusId] || "unknown";
-  };
+  useTournamentPolling(id, fetchTournament, lastKnownRound);
 
   const handleJoinTournament = async () => {
     if (!connected) {
@@ -118,25 +134,26 @@ export default function TournamentDetailsPage() {
 
     setIsJoining(true);
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const contract = new ethers.Contract(
-        TournamentContractData.address,
+      const contract = await getContract(
         TournamentContractData.abi,
-        await provider.getSigner()
+        TournamentContractData.address
       );
 
-      await contract.registerForTournament(id, {
-        value: ethers.parseEther(tournament.entryFee)
+      const tx = await contract.registerForTournament(id, {
+        value: ethers.parseEther(tournament.entryFee),
       });
+
+      toast.success("Transaction submitted!", {
+        description: "Waiting for confirmation...",
+      });
+
+      await tx.wait(); // wait until the tx is mined on-chain
 
       toast.success("Successfully joined!", {
         description: "You have successfully joined the tournament",
       });
 
-      // Update the tournament state to reflect the new participant
-      setTournament((prev) => ({
-        ...prev,
-      }));
+      await fetchTournament(); // fetch updated data
     } catch (error) {
       console.error("Error joining tournament:", error);
       toast.error("Error joining tournament", {
@@ -145,6 +162,121 @@ export default function TournamentDetailsPage() {
       });
     } finally {
       setIsJoining(false);
+    }
+  };
+
+  const handleStartTournament = async () => {
+    try {
+      const contract = await getContract(
+        TournamentContractData.abi,
+        TournamentContractData.address
+      );
+
+      const tx = await contract.startTournament(id);
+      toast.success("Tournament starting...", {
+        description: "Waiting for confirmation...",
+      });
+
+      await tx.wait();
+      toast.success("Tournament started!");
+      await fetchTournament();
+    } catch (error) {
+      console.error("Error starting tournament:", error);
+      toast.error("Failed to start tournament", {
+        description: error.reason || "An unexpected error occurred",
+      });
+    }
+  };
+
+  const handleReportMatch = (match) => {
+    setSelectedMatch(match);
+    setReportDialogOpen(true);
+  };
+
+  const joinMatchForUser = async (match) => {
+    try {
+      setJoiningMatchAddress(match.matchAddress);
+
+      console.log(match.matchAddress);
+
+      const matchContract = await getContract(
+        MatchContractData.abi,
+        match.matchAddress
+      );
+
+      const entryFee = await matchContract.getEntryFee();
+
+      const tx = await matchContract.joinMatch({ value: entryFee });
+
+      toast.success("Joining match...");
+
+      await tx.wait();
+
+      toast.success("You joined the match!");
+      await fetchTournament();
+    } catch (error) {
+      console.error("Join match error:", error);
+      toast.error("Could not join match", {
+        description: error.reason || "Check your wallet and try again.",
+      });
+    } finally {
+      setJoiningMatchAddress(null);
+    }
+  };
+
+  const handleMatchResultSubmit = async ({ match, winner }) => {
+    try {
+      const matchContract = await getContract(
+        MatchContractData.abi,
+        match.matchAddress
+      );
+      
+      const repRegistryAddress = await matchContract.reputationRegistry();
+      
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      
+      const repContract = new ethers.Contract(
+        repRegistryAddress,
+        ReputationRegistryData.abi,
+        signer
+      );      
+
+      // Get required stake amount based on player's reputation
+      const stakeAmount = await repContract.getStakeAmount(address);
+
+      // Generate a random salt
+      const saltBytes = ethers.randomBytes(32);
+      const salt = ethers.hexlify(saltBytes);
+
+      // Determine if current user is the winner
+      const didIWin = address.toLowerCase() === winner.toLowerCase();
+
+      const commitment = ethers.solidityPackedKeccak256(
+        ["string", "bytes32"],
+        ["I_report_truth", salt]
+      );
+      // Submit result with stake
+      const tx = await matchContract.commitAndRevealResult(commitment, didIWin, {
+        value: stakeAmount,
+      });
+
+      toast.success("Submitting result...", {
+        description: "Waiting for confirmation...",
+      });
+
+      await tx.wait();
+
+      toast.success("Match result submitted successfully!");
+      markResultSubmitted(match.matchAddress, address);
+
+
+      await fetchTournament(); // refresh UI
+    } catch (error) {
+      console.error("Match submission error:", error);
+      toast.error("Error submitting result", {
+        description: error.reason || "Check your wallet and try again.",
+      });
     }
   };
 
@@ -178,16 +310,18 @@ export default function TournamentDetailsPage() {
     );
   }
 
-  // const isParticipant = tournament.registeredParticipants.some(
-  //   (p) => p.address.toLowerCase() === address.toLowerCase()  // Case-insensitive check
-  // );
-  // const isFull = tournament.registeredParticipants.length >= tournament.maxParticipants;
-  // const canJoin =
-  //   !isParticipant && !isFull && tournament.status === "open" && connected;
+  const isParticipant = tournament.participantList.some(
+    (p) => p.address.toLowerCase() === address?.toLowerCase()
+  );
 
-  const isParticipant = false;
-  const isFull = false;
-  const canJoin = true;
+  const isFull =
+    tournament.registeredParticipants >= tournament.maxParticipants;
+
+  const isJoinDisabled =
+    isJoining || isFull || isParticipant || tournament.status !== "open";
+
+  const canStartTournament =
+    isParticipant && isFull && tournament.status === "open";
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -195,21 +329,16 @@ export default function TournamentDetailsPage() {
         <div>
           <h1 className="text-3xl font-bold">{tournament.title}</h1>
           <div className="flex flex-wrap gap-2 mt-2">
-            <Badge
-              variant={
-                tournament.status === "open"
-                  ? "default"
-                  : tournament.status === "active"
-                  ? "outline"
-                  : "secondary"
-              }
-            >
+            <Badge variant="default">
               {tournament.status === "open"
-                ? "Open for Entry"
+                ? "Open"
+                : tournament.status === "upcoming"
+                ? "Upcoming"
                 : tournament.status === "active"
                 ? "Active"
                 : "Completed"}
             </Badge>
+
             <Badge variant="outline" className="flex items-center gap-1">
               <Trophy className="h-3 w-3" />
               {tournament.prize}
@@ -220,21 +349,25 @@ export default function TournamentDetailsPage() {
             </Badge>
           </div>
         </div>
+        <div className="flex flex-wrap justify-end gap-3">
+          <Button
+            onClick={handleStartTournament}
+            disabled={!canStartTournament}
+          >
+            Start Tournament
+          </Button>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          {canJoin && (
-            <Button onClick={handleJoinTournament} disabled={isJoining}>
-              {isJoining
-                ? "Joining..."
-                : `Join Tournament (${tournament.entryFee})`}
-            </Button>
-          )}
+          <Button onClick={handleJoinTournament} disabled={isJoinDisabled}>
+            {isJoining
+              ? "Joining..."
+              : "Join Tournament"}
+          </Button>
+
           <Button variant="outline" asChild>
             <Link href="/tournaments">Back to Tournaments</Link>
           </Button>
         </div>
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -296,27 +429,25 @@ export default function TournamentDetailsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm">Registration</span>
-                <Badge
-                  variant={
-                    tournament.status === "open" ? "default" : "secondary"
-                  }
-                >
-                  {tournament.status === "open" ? "Open" : "Closed"}
+                <Badge variant="default">
+                  {tournament.status === "open" &&
+                  tournament.registeredParticipants < tournament.maxParticipants
+                    ? "Open"
+                    : "Closed"}
                 </Badge>
               </div>
-
               <div className="flex justify-between items-center">
                 <span className="text-sm">Entry Fee</span>
-                <span className="font-medium">{tournament.entryFee}</span>
+                <Badge variant="default">
+                  {tournament.entryFee}
+                </Badge>
               </div>
-
               <div className="flex justify-between items-center">
                 <span className="text-sm">Organizer</span>
                 <span className="font-medium text-xs truncate max-w-[150px]">
-                  {tournament.organizer}
+                  CONFIDENTIAL {/* {tournament.organizer} */}
                 </span>
               </div>
-
               {isParticipant && (
                 <div className="mt-6 p-3 bg-muted rounded-md">
                   <div className="flex items-center gap-2">
@@ -357,7 +488,7 @@ export default function TournamentDetailsPage() {
                   maxParticipants: tournament.maxParticipants,
                   totalRounds: tournament.totalRounds,
                   currentRound: tournament.currentRound,
-                  matches: tournament.matches,
+                  matches: tournamentMatches, // grouped by round
                 }}
               />
             </CardContent>
@@ -387,139 +518,25 @@ export default function TournamentDetailsPage() {
                 View scheduled, disputed, and completed matches
               </CardDescription>
             </CardHeader>
-            {/* <CardContent>
-              {tournament.matches.length > 0 ? (
+            <CardContent>
+              {tournamentMatches.flat().length > 0 ? (
                 <div className="space-y-4">
-                  {tournament.matches.map((match) => {
-                    const isUserParticipant =
-                      isParticipant &&
-                      (match.player1 === address || match.player2 === address);
-
-                    const userIsJury = true; // Replace this with actual jury check
-
-                    return (
-                      <div key={match.id} className="border rounded-lg p-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm font-medium">
-                            Round {match.round}
-                          </span>
-                          {match.status === "completed" && (
-                            <Badge
-                              variant="outline"
-                              className="bg-green-100 text-green-800"
-                            >
-                              Completed
-                            </Badge>
-                          )}
-                          {match.status === "pending" && (
-                            <Badge
-                              variant="outline"
-                              className="bg-yellow-100 text-yellow-800"
-                            >
-                              Pending Confirmation
-                            </Badge>
-                          )}
-                          {match.status === "disputed" && (
-                            <Badge
-                              variant="outline"
-                              className="bg-red-100 text-red-800"
-                            >
-                              Disputed
-                            </Badge>
-                          )}
-                          {match.status === "resolved" && (
-                            <Badge
-                              variant="outline"
-                              className="bg-purple-100 text-purple-800"
-                            >
-                              Resolved by Jury
-                            </Badge>
-                          )}
-                          {match.status === "scheduled" && (
-                            <Badge
-                              variant="outline"
-                              className="bg-blue-100 text-blue-800"
-                            >
-                              Scheduled
-                            </Badge>
-                          )}
-                        </div>
-
-                        <div className="flex justify-between items-center py-2">
-                          <div className="text-sm truncate max-w-[40%]">
-                            {match.player1}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            vs
-                          </div>
-                          <div className="text-sm truncate max-w-[40%] text-right">
-                            {match.player2}
-                          </div>
-                        </div>
-
-                        {match.winner && (
-                          <div className="mt-2 text-sm text-muted-foreground">
-                            Winner:{" "}
-                            <span className="font-medium">{match.winner}</span>
-                            {match.status === "resolved" && (
-                              <span className="ml-2 text-xs text-purple-600">
-                                (Jury Decision)
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {match.status === "pending" &&
-                          match.resolutionDeadline && (
-                            <div className="mt-1 text-xs text-yellow-600">
-                              Awaiting confirmation until{" "}
-                              {new Date(
-                                match.resolutionDeadline
-                              ).toLocaleString()}
-                            </div>
-                          )}
-
-                        <div className="mt-3 flex justify-between items-center">
-                          <div className="text-xs text-muted-foreground">
-                            {match.scheduledTime}
-                          </div>
-
-                          {isUserParticipant &&
-                            match.status === "scheduled" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleReportMatch(match)}
-                              >
-                                Report Result
-                              </Button>
-                            )}
-
-                          {isUserParticipant && match.status === "pending" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleReportMatch(match)}
-                            >
-                              Confirm Result
-                            </Button>
-                          )}
-
-                          {match.status === "disputed" && userIsJury && (
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => {
-                                // Jury decision handler logic here
-                              }}
-                            >
-                              Resolve Match
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {tournamentMatches
+                    .flat()
+                    .sort((a, b) => {
+                      const order = ["pending", "commit", "reveal", "completed", "dispute"];
+                      return order.indexOf(a.status) - order.indexOf(b.status);
+                    })
+                    .map((match, index) => (
+                      <MatchCard
+                        key={index}
+                        match={match}
+                        address={address}
+                        joiningMatchAddress={joiningMatchAddress}
+                        onJoinMatch={joinMatchForUser}
+                        onReportMatch={handleReportMatch}
+                      />
+                    ))}
                 </div>
               ) : (
                 <div className="text-center py-8">
@@ -528,10 +545,19 @@ export default function TournamentDetailsPage() {
                   </p>
                 </div>
               )}
-            </CardContent> */}
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+      <MatchReportDialog
+        open={reportDialogOpen}
+        onOpenChange={setReportDialogOpen}
+        match={selectedMatch}
+        onSubmit={async ({ winner, match }) => {
+          await handleMatchResultSubmit({ match, winner });
+          setReportDialogOpen(false);
+        }}
+      />
     </div>
   );
 }
