@@ -135,7 +135,7 @@ export default function DashboardPage() {
               scheduledTime: "N/A",
             };
 
-            if (matchStatus < 3) {
+            if (matchStatus < 4) { // pending, commit, reveal, dispute
               myMatches.push({ ...matchObj, type: "upcoming" });
             } else {
               myMatches.push({ ...matchObj, type: "played" });
@@ -200,8 +200,8 @@ export default function DashboardPage() {
         <h2 className="text-2xl font-bold mb-4">My Matches</h2>
         <Tabs defaultValue="upcoming">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-            <TabsTrigger value="played">Played</TabsTrigger>
+            <TabsTrigger value="upcoming">Active</TabsTrigger>
+            <TabsTrigger value="played">Completed</TabsTrigger>
           </TabsList>
 
           <TabsContent value="upcoming" className="mt-4">
@@ -215,7 +215,7 @@ export default function DashboardPage() {
                         <CardTitle className="line-clamp-1">
                           {match.tournamentName}
                         </CardTitle>
-                        <Badge className="text-xs" variant="outline">
+                        <Badge className="text-xs" variant={match.status === "pending" ? "default" : "secondary"}>
                           {getMatchDisplayStatus(match.status)}
                         </Badge>
                       </div>
@@ -276,7 +276,7 @@ export default function DashboardPage() {
                         <CardTitle className="line-clamp-1">
                           {match.tournamentName}
                         </CardTitle>
-                        <Badge className="text-xs">
+                        <Badge className="text-xs" variant="outline">
                           {getMatchDisplayStatus(match.status)}
                         </Badge>
                       </div>

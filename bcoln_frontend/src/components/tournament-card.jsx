@@ -22,8 +22,8 @@ export function TournamentCard({ tournament }) {
               tournament.status === "open"
                 ? "default"
                 : tournament.status === "active"
-                ? "outline"
-                : "secondary"
+                ? "secondary"
+                : "outline"
             }
           >
             {tournament.status === "open"
