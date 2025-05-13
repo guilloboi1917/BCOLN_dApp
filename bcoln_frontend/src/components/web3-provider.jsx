@@ -138,7 +138,12 @@ export function Web3Provider({ children }) {
     const balanceWei = await provider.getBalance(userAddress);
     return ethers.formatEther(balanceWei);
   };
-  
+
+  const refreshBalance = async () => {
+    if (!connected || !address) return;
+    const ethBalance = await fetchBalance(address);
+    setBalance(parseFloat(ethBalance).toFixed(4));
+  };  
 
   // Mock joining a tournament
   const joinTournament = async (tournamentId, entryFee) => {
@@ -319,10 +324,12 @@ export function Web3Provider({ children }) {
         signMessage,
         getMatchDetails,
         joinJuryAndVote,
+        refreshBalance,
       }}
     >
       {children}
     </Web3Context.Provider>
+
   );
 }
 

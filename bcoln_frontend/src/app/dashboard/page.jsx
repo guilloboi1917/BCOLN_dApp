@@ -26,7 +26,7 @@ import { ethers } from "ethers";
 import { getMatchDisplayStatus } from "@/lib/status";
 
 export default function DashboardPage() {
-  const { connected, address, balance } = useWeb3();
+  const { connected, address, balance, refreshBalance } = useWeb3();
 
   const [activeTournaments, setActiveTournaments] = useState([]);
   const [completedTournaments, setCompletedTournaments] = useState([]);
@@ -68,6 +68,8 @@ export default function DashboardPage() {
     const loadDashboard = async () => {
       setLoading(true);
       try {
+        await refreshBalance(); 
+        
         const contract = await getReadOnlyContract(
           TournamentContractData.abi,
           TournamentContractData.address

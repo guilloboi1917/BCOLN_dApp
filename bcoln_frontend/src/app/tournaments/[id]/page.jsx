@@ -34,6 +34,7 @@ import { getContract, getReadOnlyContract } from "@/lib/contracts";
 import { groupMatchesByRound } from "@/lib/match";
 import { useTournamentPolling } from "@/hooks/use-tournament-polling";
 import { markResultSubmitted } from "@/lib/submissions";
+import { TournamentUserStatus } from "@/components/tournament-user-status";
 
 import TournamentContractData from "@/../lib/contracts/TournamentContract.json";
 import MatchContractData from "../../../../lib/contracts/MatchContract.json";
@@ -80,6 +81,7 @@ export default function TournamentDetailsPage() {
       ] = await contract.getTournamentDetails(id);
 
       const _matches = await contract.getAllTournamentMatches(id);
+
       console.log(_matches);
 
       const groupedMatches = groupMatchesByRound(_matches, totalRounds);
@@ -464,19 +466,7 @@ export default function TournamentDetailsPage() {
                   CONFIDENTIAL {/* {tournament.organizer} */}
                 </span>
               </div>
-              {isParticipant && (
-                <div className="mt-6 p-3 bg-muted rounded-md">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <span className="text-sm font-medium">
-                      You are registered
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    You'll be notified when matches are scheduled
-                  </p>
-                </div>
-              )}
+              {isParticipant && <TournamentUserStatus tournament={tournament} address={address} />}
             </div>
           </CardContent>
         </Card>
