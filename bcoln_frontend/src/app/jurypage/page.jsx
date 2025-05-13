@@ -73,7 +73,7 @@ export default function JuryPage() {
               const matchDetail = await getMatchDetails(event.args[0]);
               return {
                 address: event.args[0],
-                name: `DisputedMatch_${matchDetail[5]}`,
+                name: `DisputedMatch_${matchDetail[0].slice(0,6)}_vs_${matchDetail[1].slice(0,6)}`,
                 status: matchDetail[3],
                 player1: matchDetail[0],
                 player2: matchDetail[1],

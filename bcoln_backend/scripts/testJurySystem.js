@@ -355,11 +355,11 @@ async function main() {
         const statusAfterJuror5 = await finalMatch.getMatchStatus();
         console.log("Final match status after juror5:", statusAfterJuror5);
         
-        if (statusAfterJuror5 == 3) {
-          console.log("Juror6 joining and voting for finalist2...");
-          const tx6 = await finalMatch.connect(juror6).joinJuryAndVote(2, { value: juryStake });
-          await tx6.wait();
-        }
+        // if (statusAfterJuror5 == 3) {
+        //   console.log("Juror6 joining and voting for finalist2...");
+        //   const tx6 = await finalMatch.connect(juror6).joinJuryAndVote(2, { value: juryStake });
+        //   await tx6.wait();
+        // }
       }
     } catch (error) {
       console.log("Error during final match jury voting:", error.message);
