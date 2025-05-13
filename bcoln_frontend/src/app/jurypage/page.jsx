@@ -104,34 +104,34 @@ export default function JuryPage() {
 
   useEffect(() => {
     const initializeContract = async () => {
+      if (!connected || !provider) {
+        console.log("Wallet not connected yet. Skipping contract initialization.");
+        return;
+      }
+  
       try {
-        if (!window.ethereum) {
-          throw new Error("Ethereum provider not found");
-        }
-
         console.log("Initializing provider and contract...");
-
         console.log("Connected to network:", network);
-
-        if (!provider) throw new Error("Connect Wallet First");
+  
         const signer = await provider.getSigner();
         console.log("Signer address:", await signer.getAddress());
-
+  
         const matchFactoryContract = new Contract(
           "0x5FbDB2315678afecb367f032d93F642f64180aa3",
           MatchContractFactoryData.abi,
           signer
         );
-
+  
         console.log("Contract initialized:", matchFactoryContract);
         setContract(matchFactoryContract);
       } catch (err) {
         console.error("Initialization error:", err);
       }
     };
-
+  
     initializeContract();
   }, [connected, provider]);
+  
 
   const mapStatus = (statusId) => {
     return (
