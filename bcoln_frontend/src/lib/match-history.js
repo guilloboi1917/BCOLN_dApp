@@ -17,15 +17,15 @@ export function addMatchToHistory(match) {
     }
 }
   
-export function getPaginatedMatchHistory(page = 1, pageSize = 5) {
-    const all = getStoredMatchHistory();
+export function getPaginatedMatchHistory(page = 1, pageSize = 5, customList = null) {
+    const all = customList ?? getStoredMatchHistory();
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
     return {
       total: all.length,
       data: all.slice(start, end),
     };
-}
+  }  
   
 export function clearMatchHistory() {
     localStorage.removeItem(MATCH_HISTORY_KEY);

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useWeb3 } from "@/hooks/use-web3";
 import {
@@ -10,188 +10,153 @@ import {
 import { getReadOnlyContract } from "@/lib/contracts";
 import TournamentContractData from "@/../lib/contracts/TournamentContract.json";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { TournamentCard } from "@/components/tournament-card";
-import { MatchReportDialog } from "@/components/match-report-dialog";
 import { toast } from "sonner";
-import {
-  Clock,
-  Trophy,
-  AlertCircle,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
-
+import { ArrowLeft, ArrowRight, AlertCircle } from "lucide-react";
+import { ethers } from "ethers";
+import { getMatchDisplayStatus } from "@/lib/status";
 
 export default function DashboardPage() {
   const { connected, address, balance } = useWeb3();
 
-  const [tournaments, setTournaments] = useState({
-    participating: [],
-    completed: [],
-  });
-
-  const [matches, setMatches] = useState({
-    upcoming: [],
-    played: [],
-  });
-
+  const [activeTournaments, setActiveTournaments] = useState([]);
+  const [completedTournaments, setCompletedTournaments] = useState([]);
+  const [upcomingMatches, setUpcomingMatches] = useState([]);
   const [matchPage, setMatchPage] = useState(1);
-  const matchPageSize = 3;
-
-  const {
-    total: totalPlayedMatches,
-    data: paginatedPlayedMatches,
-  } = getPaginatedMatchHistory(matchPage, matchPageSize);
-
   const [upcomingPage, setUpcomingPage] = useState(1);
-  const upcomingPageSize = 5;
-  
-  const paginatedUpcomingMatches = matches.upcoming.slice(
-    (upcomingPage - 1) * upcomingPageSize,
-    upcomingPage * upcomingPageSize
-  );
-
-  const [loading, setLoading] = useState(true);
-  const [selectedMatch, setSelectedMatch] = useState(null);
-  const [reportOpen, setReportOpen] = useState(false);
-  const [participatingPage, setParticipatingPage] = useState(1);
-  
-  const participatingPageSize = 6;
-
-  const paginatedParticipating = tournaments.participating.slice(
-    (participatingPage - 1) * participatingPageSize,
-    participatingPage * participatingPageSize
-  );
-
+  const [activePage, setActivePage] = useState(1);
   const [completedPage, setCompletedPage] = useState(1);
-  const completedPageSize = 6;
+  const [loading, setLoading] = useState(true);
 
-  const paginatedCompleted = tournaments.completed.slice(
-    (completedPage - 1) * completedPageSize,
-    completedPage * completedPageSize
-  );
+  const matchPageSize = 3;
+  const upcomingPageSize = 3;
+  const tournamentPageSize = 3;
+
+  const { total: totalPlayedMatches, data: paginatedPlayedMatches } =
+    getPaginatedMatchHistory(matchPage, matchPageSize);
+
+  const paginatedUpcomingMatches = useMemo(() => {
+    const start = (upcomingPage - 1) * upcomingPageSize;
+    const end = start + upcomingPageSize;
+    return upcomingMatches.slice(start, end);
+  }, [upcomingMatches, upcomingPage]);
+
+  const paginatedActiveTournaments = useMemo(() => {
+    const start = (activePage - 1) * tournamentPageSize;
+    const end = start + tournamentPageSize;
+    return activeTournaments.slice(start, end);
+  }, [activeTournaments, activePage]);
+
+  const paginatedCompletedTournaments = useMemo(() => {
+    const start = (completedPage - 1) * tournamentPageSize;
+    const end = start + tournamentPageSize;
+    return completedTournaments.slice(start, end);
+  }, [completedTournaments, completedPage]);
 
   useEffect(() => {
     if (!connected || !address) return;
-  
-    const loadData = async () => {
+
+    const loadDashboard = async () => {
       setLoading(true);
       try {
         const contract = await getReadOnlyContract(
           TournamentContractData.abi,
           TournamentContractData.address
         );
-  
+
         const rawTournaments = await contract.getAllTournaments();
-        const all = rawTournaments.map((t, i) => ({
+
+        const tournamentList = rawTournaments.map((t, i) => ({
           id: i.toString(),
+          title: t.name,
           name: t.name,
           description: t.description,
-          entryFee: t.entryFee,
-          prize: t.totalPrize,
+          entryFee: ethers.formatEther(t.entryFee),
+          prize: ethers.formatEther(t.totalPrize),
+          participants: Number(t.maxParticipants),
           maxParticipants: Number(t.maxParticipants),
+          registered: Number(t.registeredParticipants),
           startDate: new Date(Number(t.startTime) * 1000).toLocaleDateString(),
           status: ["open", "active", "completed", "cancelled"][Number(t.status)],
-          registered: Number(t.registeredParticipants),
         }));
-  
-        const participating = [];
-        const completed = [];
-        const matchList = [];
-  
-        for (const tournament of all) {
-          const tournamentDetails = await contract.getTournamentDetails(tournament.id);
-          const participants = tournamentDetails[10];
-  
-          const isParticipant = participants.some(
+
+        const myActive = [];
+        const myCompleted = [];
+        const myMatches = [];
+
+        for (const t of tournamentList) {
+          const details = await contract.getTournamentDetails(t.id);
+          const participants = details[10];
+
+          const isMine = participants.some(
             (p) => p.toLowerCase() === address.toLowerCase()
           );
-  
-          if (isParticipant) {
-            participating.push(tournament);
+
+          if (!isMine) continue;
+
+          if (t.status === "active" || t.status === "open") {
+            myActive.push(t);
+          } else if (t.status === "completed") {
+            myCompleted.push(t);
           }
-  
-          if (tournament.status === "completed") {
-            completed.push(tournament);
-          }
-  
-          if (isParticipant) {
-            const tournamentMatches = await contract.getAllTournamentMatches(tournament.id);
-  
-            for (const match of tournamentMatches) {
-              const matchAddress = match[0];
-              const matchRound = Number(match[5]);
-              const matchStatus = Number(match[9]);
-              const player1 = match[2];
-              const player2 = match[3];
-              const winner = match[4];
-  
-              const isMyMatch =
-                player1?.toLowerCase() === address.toLowerCase() ||
-                player2?.toLowerCase() === address.toLowerCase();
-  
-              if (isMyMatch) {
-                const matchData = {
-                  id: matchAddress,
-                  round: matchRound,
-                  tournamentId: tournament.id,
-                  tournamentName: tournament.name,
-                  player1,
-                  player2,
-                  scheduledTime: "N/A",
-                  status: ["pending", "commit", "reveal", "dispute", "completed"][matchStatus],
-                  winner,
-                  needsReport:
-                    matchStatus === 1 &&
-                    winner === "0x0000000000000000000000000000000000000000",
-                };
-  
-                if (matchStatus < 3) {
-                  matchList.push({ ...matchData, type: "upcoming" });
-                } else {
-                  matchList.push({ ...matchData, type: "played" });
-                  addMatchToHistory(matchData);
-                }
-              }
+
+          const tournamentMatches = await contract.getAllTournamentMatches(t.id);
+          for (const match of tournamentMatches) {
+            const matchAddress = match[0];
+            const player1 = match[2];
+            const player2 = match[3];
+            const winner = match[4];
+            const matchStatus = Number(match[9]);
+
+            const isMyMatch =
+              player1?.toLowerCase() === address.toLowerCase() ||
+              player2?.toLowerCase() === address.toLowerCase();
+
+            if (!isMyMatch) continue;
+
+            const statusLabels = ["pending", "commit", "reveal", "dispute", "completed"];
+            const matchObj = {
+              id: matchAddress,
+              tournamentId: t.id,
+              tournamentName: t.name,
+              player1,
+              player2,
+              winner,
+              status: statusLabels[matchStatus] ?? "unknown",
+              scheduledTime: "N/A",
+            };
+
+            if (matchStatus < 3) {
+              myMatches.push({ ...matchObj, type: "upcoming" });
+            } else {
+              myMatches.push({ ...matchObj, type: "played" });
+              addMatchToHistory(matchObj);
             }
           }
         }
-  
-        setTournaments({ participating, completed });
-        setMatches({
-          upcoming: matchList.filter((m) => m.type === "upcoming"),
-          played: matchList.filter((m) => m.type === "played"),
-        });
+
+        setActiveTournaments(myActive);
+        setCompletedTournaments(myCompleted);
+        setUpcomingMatches(myMatches.filter((m) => m.type === "upcoming"));
       } catch (err) {
-        console.error("Failed to load dashboard:", err);
-        toast.error("Error loading dashboard");
+        console.error("Dashboard load error:", err);
+        toast.error("Failed to load dashboard data");
       } finally {
         setLoading(false);
       }
     };
-  
-    // Initial load
-    loadData();
-  
-    // Reload data on browser focus
-    const handleFocus = () => {
-      loadData();
-    };
-  
-    window.addEventListener("focus", handleFocus);
-  
-    return () => {
-      window.removeEventListener("focus", handleFocus);
-    };
+
+    loadDashboard();
   }, [connected, address]);
-  
 
   if (!connected) {
     return (
@@ -227,14 +192,11 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader><CardTitle>Active Tournaments</CardTitle></CardHeader>
-          <CardContent className="text-2xl font-bold">
-            {tournaments.participating.filter((t) => t.status === "active").length}
-          </CardContent>
+          <CardContent className="text-2xl font-bold">{activeTournaments.length}</CardContent>
         </Card>
       </div>
 
-      {/* Matches Section */}
-      <section className="mb-8">
+      <section className="mb-12">
         <h2 className="text-2xl font-bold mb-4">My Matches</h2>
         <Tabs defaultValue="upcoming">
           <TabsList className="grid w-full grid-cols-2">
@@ -243,158 +205,211 @@ export default function DashboardPage() {
           </TabsList>
 
           <TabsContent value="upcoming" className="mt-4">
-            {matches.upcoming.length > 0 ? (
-              <div className="space-y-4">
-                {paginatedUpcomingMatches.map((match) => (
-                  <Card key={match.id}>
-                    <CardContent className="p-4">
-                      <div className="font-medium">{match.tournamentName}</div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="w-4 h-4" /> {match.scheduledTime}
-                      </div>
-                      <div className="text-sm">Opponent: {match.player2 || "TBD"}</div>
-                      <Button asChild size="sm" className="mt-2">
-                        <Link href={`/tournaments/${match.tournamentId}`}>View Tournament</Link>
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-                <div className="flex justify-between items-center mt-4">
-                  <Button
-                    onClick={() => setUpcomingPage((p) => Math.max(1, p - 1))}
-                    disabled={upcomingPage === 1}
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm">Page {upcomingPage}</span>
-                  <Button
-                    onClick={() =>
-                      setUpcomingPage((p) =>
-                        p * upcomingPageSize < matches.upcoming.length ? p + 1 : p
-                      )
-                    }
-                    disabled={upcomingPage * upcomingPageSize >= matches.upcoming.length}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-muted-foreground">No upcoming matches.</p>
-            )}
-          </TabsContent>
-
-          <TabsContent value="played" className="mt-4">
-            {matches.played.length > 0 ? (
-              <div className="space-y-4">
-                {paginatedPlayedMatches.map((match) => (
-                  <Card key={match.id}>
-                    <CardContent className="p-4 space-y-2">
-                      <div className="font-medium">{match.tournamentName}</div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="w-4 h-4" /> {match.scheduledTime}
-                      </div>
-                      <div className="text-sm">Opponent: {match.player2}</div>
-                      {match.needsReport && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedMatch(match);
-                            setReportOpen(true);
-                          }}
-                        >
-                          Report Result
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-                <div className="flex justify-between items-center mt-4">
-                  <Button
-                    onClick={() => setMatchPage((p) => Math.max(1, p - 1))}
-                    disabled={matchPage === 1}
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm">Page {matchPage}</span>
-                  <Button
-                    onClick={() =>
-                      setMatchPage((p) =>
-                        p * matchPageSize < totalPlayedMatches ? p + 1 : p
-                      )
-                    }
-                    disabled={matchPage * matchPageSize >= totalPlayedMatches}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-muted-foreground">No played matches yet.</p>
-            )}
-          </TabsContent>
-        </Tabs>
-      </section>
-
-      {/* Participating + Completed Tournaments */}
-      <section className="mt-8">
-        <h2 className="text-2xl font-bold mb-4">Tournaments</h2>
-        <Tabs defaultValue="participating">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="participating">Participating</TabsTrigger>
-            <TabsTrigger value="completed">Completed</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="completed" className="mt-6">
-            {tournaments.completed.length > 0 ? (
+            {paginatedUpcomingMatches.length > 0 ? (
               <>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {paginatedCompleted.map((t) => (
-                    <TournamentCard key={t.id} tournament={t} />
+                  {paginatedUpcomingMatches.map((match) => (
+                    <Card key={match.id}>
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-center">
+                        <CardTitle className="line-clamp-1">
+                          {match.tournamentName}
+                        </CardTitle>
+                        <Badge className="text-xs" variant="outline">
+                          {getMatchDisplayStatus(match.status)}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                  
+                    <CardContent className="pb-2">
+                      <p className="text-sm text-muted-foreground">
+                        Opponent: {match.player2 || "TBD"}
+                      </p>
+                    </CardContent>
+                  
+                    <CardFooter className="pt-2 flex justify-end">
+                      <Button asChild size="sm">
+                        <Link href={`/tournaments/${match.tournamentId}`}>View Details</Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>                                
                   ))}
-                </div>
-
-                <div className="flex justify-between items-center mt-4">
-                  <Button
-                    onClick={() => setCompletedPage((p) => Math.max(1, p - 1))}
-                    disabled={completedPage === 1}
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm">Page {completedPage}</span>
-                  <Button
-                    onClick={() =>
-                      setCompletedPage((p) =>
-                        p * completedPageSize < tournaments.completed.length ? p + 1 : p
-                      )
-                    }
-                    disabled={
-                      completedPage * completedPageSize >= tournaments.completed.length
-                    }
-                  >
-                    Next
-                  </Button>
                 </div>
               </>
             ) : (
-              <p className="text-muted-foreground">No completed tournaments.</p>
+              <p className="text-muted-foreground mt-2">No upcoming matches.</p>
             )}
+
+            <div className="flex justify-center items-center gap-2 mt-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setUpcomingPage((p) => Math.max(1, p - 1))}
+                disabled={upcomingPage === 1}
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm font-medium">{upcomingPage}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() =>
+                  setUpcomingPage((p) =>
+                    p * upcomingPageSize < upcomingMatches.length ? p + 1 : p
+                  )
+                }
+                disabled={upcomingPage * upcomingPageSize >= upcomingMatches.length}
+              >
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
           </TabsContent>
 
+          <TabsContent value="played" className="mt-4">
+            {paginatedPlayedMatches.length > 0 ? (
+              <>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {paginatedPlayedMatches.map((match) => (
+                    <Card key={match.id}>
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-center">
+                        <CardTitle className="line-clamp-1">
+                          {match.tournamentName}
+                        </CardTitle>
+                        <Badge className="text-xs">
+                          {getMatchDisplayStatus(match.status)}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                  
+                    <CardContent className="pb-2">
+                      <p className="text-sm text-muted-foreground">
+                        Opponent: {match.player2 || "TBD"}
+                      </p>
+                    </CardContent>
+                  
+                    <CardFooter className="pt-2 flex justify-end">
+                      <Button asChild size="sm">
+                        <Link href={`/tournaments/${match.tournamentId}`}>View Details</Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-muted-foreground mt-2">No played matches yet.</p>
+            )}
+
+            <div className="flex justify-center items-center gap-2 mt-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setMatchPage((p) => Math.max(1, p - 1))}
+                disabled={matchPage === 1}
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm font-medium">{matchPage}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() =>
+                  setMatchPage((p) =>
+                    p * matchPageSize < totalPlayedMatches ? p + 1 : p
+                  )
+                }
+                disabled={matchPage * matchPageSize >= totalPlayedMatches}
+              >
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </TabsContent>
 
         </Tabs>
       </section>
 
-      <MatchReportDialog
-        open={reportOpen}
-        onOpenChange={setReportOpen}
-        match={selectedMatch}
-        onSubmit={() => {
-          toast.success("Match result submitted.");
-          setReportOpen(false);
-        }}
-      />
+      <section>
+        <h2 className="text-2xl font-bold mb-4">Tournaments</h2>
+        <Tabs defaultValue="active">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="active">Active</TabsTrigger>
+            <TabsTrigger value="completed">Completed</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="active" className="mt-4">
+            {paginatedActiveTournaments.length > 0 ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {paginatedActiveTournaments.map((t) => (
+                  <TournamentCard key={t.id} tournament={t} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">No active tournaments.</p>
+            )}
+
+            <div className="flex justify-center items-center gap-2 mt-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setActivePage((p) => Math.max(1, p - 1))}
+                disabled={activePage === 1}
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm font-medium">{activePage}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() =>
+                  setActivePage((p) =>
+                    p * tournamentPageSize < activeTournaments.length ? p + 1 : p
+                  )
+                }
+                disabled={activePage * tournamentPageSize >= activeTournaments.length}
+              >
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="completed" className="mt-4">
+            {paginatedCompletedTournaments.length > 0 ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {paginatedCompletedTournaments.map((t) => (
+                  <TournamentCard key={t.id} tournament={t} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">No completed tournaments.</p>
+            )}
+
+            <div className="flex justify-center items-center gap-2 mt-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setCompletedPage((p) => Math.max(1, p - 1))}
+                disabled={completedPage === 1}
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm font-medium">{completedPage}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() =>
+                  setCompletedPage((p) =>
+                    p * tournamentPageSize < completedTournaments.length ? p + 1 : p
+                  )
+                }
+                disabled={completedPage * tournamentPageSize >= completedTournaments.length}
+              >
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </section>
     </div>
   );
 }
