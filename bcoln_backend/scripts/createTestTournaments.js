@@ -242,10 +242,14 @@ async function main() {
         // Players commit their results
         console.log("Player3 committing and revealing result...");
         await match2.connect(player3).commitAndRevealResult(player3Commitment, true, { value: p3StakeMultiplier });
+
+        // await match2.connect(player3).storeMatchLog("TestCID1");
         
         // BOTH REPORT TRUE
-        console.log("Player4 committing and revealing result...");
-        await match2.connect(player4).commitAndRevealResult(player4Commitment, true, { value: p4StakeMultiplier });
+        // console.log("Player4 committing and revealing result...");
+        // await match2.connect(player4).commitAndRevealResult(player4Commitment, true, { value: p4StakeMultiplier });
+        // await match2.connect(player4).storeMatchLog("TestCID2");
+
 
         // console.log("Player4 committing result...");
         // await match2.connect(player4).commitResult(player4Commitment,{ value: p4StakeMultiplier });

@@ -9,17 +9,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Filter, SearchCheck } from "lucide-react";
+import { Search, Filter, SearchCheck, Download } from "lucide-react";
 import { ethers, Contract, BrowserProvider } from "ethers";
 import { Card } from "@/components/ui/card"; // Make sure to import Card
 import { useWeb3 } from "@/hooks/use-web3";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 import { JuryVoteDialog } from "@/components/jury-vote-dialog";
 
 import TournamentContractData from "../../../lib/contracts/TournamentContract.json";
 import MatchContractData from "../../../lib/contracts/MatchContract.json";
 import MatchContractFactoryData from "../../../lib/contracts/MatchContractFactory.json";
+import { getJSONFromIPFS } from "@/lib/ipfs";
 
 export default function JuryPage() {
   const {
@@ -73,10 +73,12 @@ export default function JuryPage() {
               const matchDetail = await getMatchDetails(event.args[0]);
               return {
                 address: event.args[0],
-                name: `DisputedMatch_${matchDetail[0].slice(0,6)}_vs_${matchDetail[1].slice(0,6)}`,
+                name: `DisputedMatch_${matchDetail[0].slice(0, 6)}_vs_${matchDetail[1].slice(0, 6)}`,
                 status: matchDetail[3],
                 player1: matchDetail[0],
                 player2: matchDetail[1],
+                player1IPFSCID: matchDetail.p1IPFSCID,
+                player2IPFSCID: matchDetail.p2IPFSCID
               };
             } catch (error) {
               console.error(
@@ -161,6 +163,41 @@ export default function JuryPage() {
       setIsSubmitting(false);
     }
   };
+
+  const handleDownloadMatchLogs = async (match) => {
+    try {
+      console.log("Player1CID: ", match.player1IPFSCID);
+      console.log("Player2CID: ", match.player2IPFSCID);
+
+      // Fetch both logs in parallel
+      const [matchLog1, matchLog2] = await Promise.all([
+        getJSONFromIPFS(match.player1IPFSCID),
+        getJSONFromIPFS(match.player2IPFSCID)
+      ]);
+
+
+      // Create download function
+      const downloadJSON = (data, filename) => {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
+
+      // Download both files
+      downloadJSON(matchLog1, `match-log-player1-${match.matchId}.json`);
+      downloadJSON(matchLog2, `match-log-player2-${match.matchId}.json`);
+
+    } catch (error) {
+      console.error('Error downloading match logs:', error);
+      // Handle error (e.g., show toast notification)
+    }
+  };
   // Memoized filtered matches
   const filteredMatches = useCallback(() => {
     return disputedMatches.filter((match) => {
@@ -208,21 +245,38 @@ export default function JuryPage() {
                   Status: {mapStatus(match.status)}
                 </p>
               </div>
+              <div>
+                {/* Button with inline tooltip */}
+                <div className="group ml-auto relative inline-block">
+                  <Button
+                    size="lg"
+                    className="h-10 w-10 hover:bg-gray-400"
+                    onClick={() => handleJoinJury(match)}
+                    aria-label="Join Jury"
+                  >
+                    <SearchCheck className="h-5 w-5" />
+                  </Button>
+                  {/* Tooltip (appears on hover) */}
+                  <span className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute top-full right-0 mt-1 px-2 py-1 text-xs bg-gray-800 text-white rounded whitespace-nowrap">
+                    Join Jury
+                  </span>
+                </div>
 
-              {/* Button with inline tooltip */}
-              <div className="group ml-auto relative inline-block">
-                <Button
-                  size="lg"
-                  className="h-10 w-10 hover:bg-gray-400"
-                  onClick={() => handleJoinJury(match)}
-                  aria-label="Join Jury"
-                >
-                  <SearchCheck className="h-5 w-5" />
-                </Button>
-                {/* Tooltip (appears on hover) */}
-                <span className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute top-full right-0 mt-1 px-2 py-1 text-xs bg-gray-800 text-white rounded whitespace-nowrap">
-                  Join Jury
-                </span>
+                {/* Button with inline tooltip */}
+                <div className="group ml-5 relative inline-block">
+                  <Button
+                    size="lg"
+                    className="h-10 w-10 hover:bg-gray-400"
+                    onClick={() => handleDownloadMatchLogs(match)}
+                    aria-label="Download Match Logs"
+                  >
+                    <Download className="h-5 w-5" />
+                  </Button>
+                  {/* Tooltip (appears on hover) */}
+                  <span className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute top-full right-0 mt-1 px-2 py-1 text-xs bg-gray-800 text-white rounded whitespace-nowrap">
+                    Download Match Logs
+                  </span>
+                </div>
               </div>
             </Card>
           ))}
