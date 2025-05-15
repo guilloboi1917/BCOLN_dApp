@@ -137,7 +137,7 @@ export function MatchCard({
               size="sm"
               variant="default"
               onClick={() =>
-                toast.info("Jury functionality coming soon")
+                toast.info("Jury functionality can be found on Jury Page")
               }
             >
               Resolve as Juror

@@ -242,7 +242,10 @@ async function main() {
         // Players commit their results
         console.log("Player3 committing and revealing result...");
         await match2.connect(player3).commitAndRevealResult(player3Commitment, true, { value: p3StakeMultiplier });
+        console.log("Player4 committing and revealing result...");
         await match2.connect(player4).commitAndRevealResult(player4Commitment, true, { value: p4StakeMultiplier });
+
+        console.log("Match in DISPUTE");
 
         await match2.connect(player1).joinJuryAndVote(1, { value: ethers.parseEther("0.1") });
         await match2.connect(player5).joinJuryAndVote(1, { value: ethers.parseEther("0.1") });
